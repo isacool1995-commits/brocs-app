@@ -1,0 +1,13 @@
+{
+  "name": "broks-crm",
+  "private": true,
+  "description": "Брокс CRM: статический сайт и серверные функции Vercel",
+  "scripts": {
+    "build": "echo \"Сборка не нужна\""
+  },
+  "dependencies": {
+    "imapflow": "^1.0.164",
+    "mailparser": "^3.7.1",
+    "nodemailer": "^6.9.14"
+  }
+}

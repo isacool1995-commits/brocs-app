@@ -135,3 +135,55 @@ begin
   if r is null then select data into r from docs where col = 'roles' and id = 'r_manager'; end if;
   return coalesce(r, '{}'::jsonb);
 end $$;
+-- Почта: подключённые ящики (только для сервера) и права на письма
+create table if not exists public.mail_accounts (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  name text,
+  imap_host text not null,
+  imap_port int not null default 993,
+  smtp_host text not null,
+  smtp_port int not null default 465,
+  login text not null,
+  pass_enc text not null,
+  last_uid bigint not null default 0,
+  uidvalidity bigint,
+  created_at timestamptz not null default now()
+);
+alter table public.mail_accounts enable row level security;
+revoke all on public.mail_accounts from anon, authenticated;
+
+create or replace function public.can_mail() returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce((public.my_role()->>'manage')::boolean, false) or coalesce((public.my_role()->>'mail')::boolean, false)
+$$;
+
+drop policy if exists docs_select on public.docs;
+drop policy if exists docs_insert on public.docs;
+drop policy if exists docs_update on public.docs;
+drop policy if exists docs_delete on public.docs;
+
+create policy docs_select on public.docs for select to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_active()
+       when col = 'mail' then public.can_mail()
+       else public.can_do(col, 'view', data) end);
+
+create policy docs_insert on public.docs for insert to authenticated with check (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       else public.can_do(col, 'create', data) end);
+
+create policy docs_update on public.docs for update to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       else public.can_do(col, 'edit', data) end)
+  with check (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       else public.is_active() end);
+
+create policy docs_delete on public.docs for delete to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.is_admin()
+       else public.can_do(col, 'del', data) end);
+

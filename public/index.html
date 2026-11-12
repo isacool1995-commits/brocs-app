@@ -253,6 +253,17 @@ td.r,th.r{text-align:right}
 .stage-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .stage-row:last-child{border-bottom:0}
 .stage-row .inp{flex:1;min-width:160px}
+.mailbox{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:16px;align-items:start}
+.mail-list .body{max-height:calc(100vh - 230px);overflow-y:auto}
+.mail-row.sel{background:var(--accent-soft)}
+.mail-row.unread .t{color:var(--accent)}
+.mail-row.unread .t::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px}
+.mail-meta{padding:12px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.mail-meta .fk{display:inline-block;min-width:76px}
+.mail-att{padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px}
+.mail-text{padding:16px;line-height:1.55;max-height:calc(100vh - 330px);overflow-y:auto}
+.mailmsg{cursor:pointer;border:1px dashed var(--line)}
+@media (max-width:900px){.mailbox{grid-template-columns:minmax(0,1fr)}.mail-list .body,.mail-text{max-height:none}}
 .settings{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
 .set-nav{display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:6px}
 .set-nav button{text-align:left;border:0;background:transparent;padding:10px 12px;border-radius:8px;font-weight:700;color:var(--muted);white-space:nowrap}
@@ -363,9 +374,10 @@ const ICONS={
   reports:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
   team:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   setup:'<path d="M3 5h18l-7 8v6l-4-2v-4Z"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 };
-const VIEWS=[['home','Рабочий стол'],['deals','Сделки'],['tasks','Задачи'],['contacts','Клиенты'],['reports','Аналитика'],['setup','Воронки'],['settings','Настройки']];
+const VIEWS=[['home','Рабочий стол'],['deals','Сделки'],['tasks','Задачи'],['contacts','Клиенты'],['reports','Аналитика'],['mail','Почта'],['setup','Воронки'],['settings','Настройки']];
 const ADMIN_VIEWS=['setup','settings'];
 function roleMenu(r){ return Array.isArray(r.menu)?r.menu:['home','deals','tasks','contacts'].concat(r.reports?['reports']:[]) }
 function allowedViews(){ if(isBoss()) return VIEWS.map(v=>v[0]); const m=roleMenu(myRole()); return VIEWS.map(v=>v[0]).filter(k=>!ADMIN_VIEWS.includes(k)&&(k==='home'||m.includes(k))) }
@@ -379,7 +391,7 @@ const DEFAULT_STAGES=[
 const PALETTE=['#5B7CE6','#2BA3C4','#1C9E7E','#7DB547','#D59A1F','#E0703A','#D2504B','#B865D6','#7A869A'];
 const WON='won', LOST='lost';
 const TASK_TYPES=['Звонок','Встреча','Письмо','Дело'];
-const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config'];
+const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config','mail'];
 const FORMS=['ИП','ТОО','Другое'];
 const TAX=['Общеустановленный режим','Не общеустановленный (спецрежим)'];
 const PAYERS=['Юридическое лицо','Физическое лицо'];
@@ -387,7 +399,7 @@ const PAYS=['Kaspi Gold','Рассрочка','Счёт на юрлицо'];
 const opts=(arr,v)=>'<option value="">Не указано</option>'+arr.map(x=>'<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>').join('');
 
 let savedPipe='main'; try{ savedPipe=localStorage.getItem('broks.pipe')||'main' }catch(e){}
-const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},config:{},roleSel:'r_manager',setTab:'general',myIp:null,stages:null,me:null,owner:false,pipe:savedPipe,
+const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},config:{},mail:{},boxes:null,mailSel:null,roleSel:'r_manager',setTab:'general',myIp:null,stages:null,me:null,owner:false,pipe:savedPipe,
   mode:'starting',view:'home',q:'',dealsMode:'board',dealsOwner:'all',dealsStatus:'open',taskFilter:'mine',
   contactTab:'companies',period:'month',overlay:null};
 let db=null, users=null;
@@ -597,7 +609,7 @@ function render(force){
   let html='';
   if(S.mode==='local') html+='<div class="notice warn">Пробный режим: сервер не подключён к базе, изменения не сохраняются. Проверьте ключи Supabase в настройках Vercel.</div>';
   if(S.mode==='slow') html+='<div class="notice warn">База пока не отвечает. Данные появятся, как только восстановится связь.</div>';
-  html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup,settings:vSettings}[S.view])();
+  html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup,settings:vSettings,mail:vMail}[S.view])();
   main.innerHTML=html; applyPerms(main);
   if(S.overlay&&S.overlay.kind==='deal'&&!S.overlay.isNew){ renderDealLive(); updateWa() }
 }
@@ -724,6 +736,69 @@ function vTeam(){
   const rest=ms.filter(m=>!known.has(m.dept)); if(rest.length) h+=group('Без отдела',rest,null);
   if(boss) h+=rolesPanel();
   return h }
+// ---------- Почта ----------
+const MAIL_PRESETS=[
+  [/^(gmail\.com|googlemail\.com)$/,'Gmail','imap.gmail.com',993,'smtp.gmail.com',465,'Google-аккаунт → Безопасность → Двухэтапная аутентификация → Пароли приложений'],
+  [/^(mail\.ru|bk\.ru|inbox\.ru|list\.ru|internet\.ru)$/,'Mail.ru','imap.mail.ru',993,'smtp.mail.ru',465,'Mail.ru → Настройки → Безопасность → Пароли для внешних приложений'],
+  [/^(yandex\.(ru|kz|by|com)|ya\.ru)$/,'Яндекс','imap.yandex.ru',993,'smtp.yandex.ru',465,'Яндекс ID → Безопасность → Пароли приложений → Почта'],
+  [/^(outlook\.com|hotmail\.com|live\.com)$/,'Outlook','outlook.office365.com',993,'smtp.office365.com',587,'Аккаунт Microsoft → Безопасность → Пароли приложений']
+];
+function mailPreset(email){ const d=String(email||'').split('@')[1]||''; return MAIL_PRESETS.find(p=>p[0].test(d.toLowerCase())) }
+async function apiMail(action,payload){
+  const {data:{session}}=await sb.auth.getSession();
+  let r; try{ r=await fetch('/api/mail',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(session?session.access_token:'')},body:JSON.stringify(Object.assign({action},payload||{}))}) }catch(e){ throw new Error('Нет связи с сервером. Проверьте интернет.') }
+  let j={}; try{ j=await r.json() }catch(e){}
+  if(!r.ok) throw new Error(j.error||'Сервер почты не ответил. Повторите.'); return j }
+const mailFolder=()=>S.mailFolder||'in';
+function mailPeer(m){ return m.folder==='out'?((m.to||[])[0]||{}):(m.from||{}) }
+function contactByEmail(email){ email=String(email||'').toLowerCase(); return email?vis('contacts').find(c=>String(c.email||'').toLowerCase()===email):null }
+function dealForContact(cid){ return vis('deals').filter(d=>d.contact===cid).sort((a,b)=>(isOpen(b)-isOpen(a))||(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] }
+async function loadBoxes(force){ if(!sb||(S.boxes&&!force)||S.boxesLoading) return; S.boxesLoading=true;
+  try{ const j=await apiMail('boxes'); S.boxes=j.boxes||[] }catch(e){ S.boxes=[]; S.mailErr=e.message } S.boxesLoading=false; render() }
+async function syncMail(manual){ if(!sb||S.mailSyncing) return; S.mailSyncing=true; S.mailSyncedAt=Date.now(); if(manual) render();
+  try{ const j=await apiMail('sync'); S.mailSyncedAt=Date.now(); if(j.errors&&j.errors.length) toast(j.errors[0]); else if(manual) toast(j.added?'Новых писем: '+j.added:'Новых писем нет'); if(j.added) await loadAll() }
+  catch(e){ if(manual) toast(e.message) } S.mailSyncing=false; render() }
+function vMail(){
+  if(!sb) return '<div class="vh"><h1>Почта</h1></div><div class="panel">'+emptyBox('Почта работает только на сайте','Откройте CRM по адресу сайта и войдите.')+'</div>';
+  loadBoxes(); if(S.boxes&&S.boxes.length&&(!S.mailSyncedAt||Date.now()-S.mailSyncedAt>60000)) setTimeout(()=>syncMail(false),0);
+  const boss=isBoss();
+  let h='<div class="vh"><h1>Почта</h1>'+(S.boxes&&S.boxes.length?'<button class="btn" data-a="mail-sync"'+(S.mailSyncing?' disabled':'')+'>'+(S.mailSyncing?'Проверяем…':'Проверить почту')+'</button><button class="btn primary" data-a="mail-compose">Написать письмо</button>':'')+(boss?'<button class="btn ghost" data-a="mail-boxes">Почтовые ящики</button>':'')+'</div>';
+  if(!S.boxes) return h+'<div class="panel">'+emptyBox('Загружаем почту…','')+'</div>';
+  if(!S.boxes.length) return h+'<div class="panel">'+emptyBox('Почта не подключена',boss?'Нажмите «Почтовые ящики» и подключите ящик компании, например sales@… Письма клиентов будут приходить сюда, а отвечать можно прямо из CRM.':'Попросите руководителя подключить почтовый ящик.')+'</div>';
+  const f=mailFolder(), q=S.q.trim().toLowerCase();
+  const ms=vis('mail').filter(m=>m.folder===f).filter(m=>!q||[m.subject,m.text,mailPeer(m).email,mailPeer(m).name].join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const sel=S.mail[S.mailSel]?Object.assign({id:S.mailSel},S.mail[S.mailSel]):null;
+  const unread=vis('mail').filter(m=>m.folder==='in'&&!m.seen).length;
+  h+='<div class="mailbox"><section class="panel mail-list"><header><div class="seg"><button data-a="mail-folder" data-v="in" aria-pressed="'+(f==='in')+'">Входящие'+(unread?' <span class="num">'+unread+'</span>':'')+'</button><button data-a="mail-folder" data-v="out" aria-pressed="'+(f==='out')+'">Отправленные</button></div></header><div class="body">'+
+    (ms.length?ms.slice(0,300).map(m=>{ const p=mailPeer(m); return '<div class="row mail-row'+(m.id===S.mailSel?' sel':'')+(m.folder==='in'&&!m.seen?' unread':'')+'" data-a="mail-open" data-id="'+esc(m.id)+'"><div class="grow"><div class="t">'+esc(p.name||p.email||'—')+'</div><div class="m"><b>'+esc(m.subject||'(без темы)')+'</b> · '+esc(String(m.text||'').replace(/\s+/g,' ').slice(0,90))+'</div></div><span class="due num">'+esc(fmtDate(m.date))+'</span></div>' }).join(''):emptyBox(f==='in'?'Входящих пока нет':'Отправленных пока нет',f==='in'?'Нажмите «Проверить почту», чтобы загрузить новые письма.':'Отправленные из CRM письма появятся здесь.'))+
+    '</div></section><section class="panel mail-read">'+(sel?mailReader(sel):emptyBox('Выберите письмо','Его текст появится здесь.'))+'</section></div>';
+  return h }
+function mailReader(m){ const p=mailPeer(m), c=contactByEmail(p.email), d=c?dealForContact(c.id):null;
+  const to=(m.to||[]).map(x=>x.name?x.name+' <'+x.email+'>':x.email).join(', ');
+  return '<header><h2>'+esc(m.subject||'(без темы)')+'</h2></header><div class="mail-meta"><div><span class="fk">'+(m.folder==='out'?'Кому':'От кого')+'</span> <b>'+esc(p.name||'')+'</b> '+esc(p.email||'')+'</div>'+(m.folder==='in'?'<div><span class="fk">Кому</span> '+esc(to)+'</div>':'')+'<div><span class="fk">Дата</span> '+esc(fmtDate(m.date,true))+'</div>'+
+    '<div class="crow">'+(m.folder==='in'?'<button class="btn sm primary" data-a="mail-reply" data-id="'+esc(m.id)+'">Ответить</button>':'')+
+    (d?'<button class="btn sm" data-a="open-deal" data-id="'+esc(d.id)+'">Открыть сделку «'+esc(d.title)+'»</button>':can('deals','create')&&p.email?'<button class="btn sm" data-a="mail-deal" data-id="'+esc(m.id)+'">Создать сделку из письма</button>':'')+'</div></div>'+
+    ((m.attachments||[]).length?'<div class="mail-att">Вложения: '+m.attachments.map(esc).join(', ')+' <span style="color:var(--muted)">(откройте в почтовом ящике)</span></div>':'')+
+    '<div class="mail-text x">'+esc(m.text||'')+'</div>' }
+function drawMailCompose(){ const o=S.overlay; const boxes=S.boxes||[];
+  modal(o.reply?'Ответ на письмо':'Новое письмо',
+    (boxes.length>1?'<label class="f">От кого<select class="inp" id="mc-box">'+boxes.map(b=>'<option value="'+esc(b.id)+'"'+(b.id===o.box?' selected':'')+'>'+esc(b.name?b.name+' <'+b.email+'>':b.email)+'</option>').join('')+'</select></label>':'<p style="margin:0;color:var(--muted)">От кого: <b>'+esc(boxes[0]?boxes[0].email:'')+'</b></p>')+
+    '<label class="f">Кому<input class="inp" id="mc-to" type="email" multiple value="'+esc(o.to||'')+'" placeholder="client@mail.kz"></label>'+
+    '<label class="f">Тема<input class="inp" id="mc-subj" value="'+esc(o.subject||'')+'" maxlength="300"></label>'+
+    '<label class="f">Текст письма<textarea class="inp" id="mc-text" rows="9" style="min-height:180px">'+esc(o.text||'')+'</textarea></label>',
+    '<button class="btn" data-a="close">Отмена</button><button class="btn primary" data-a="mail-send">Отправить</button>');
+  const t=$(o.to?'#mc-text':'#mc-to'); if(t){ t.focus(); if(o.to&&t.setSelectionRange) t.setSelectionRange(0,0) } }
+function drawMailBoxes(){ const boxes=S.boxes||[];
+  modal('Почтовые ящики',
+    (boxes.length?'<div class="panel">'+boxes.map(b=>'<div class="row" style="cursor:default"><div class="grow"><div class="t">'+esc(b.email)+'</div><div class="m">'+esc([b.name,b.imap_host].filter(Boolean).join(' · '))+'</div></div><button class="btn sm ghost danger" data-a="mail-box-del" data-id="'+esc(b.id)+'">Отключить</button></div>').join('')+'</div>':'<p style="margin:0;color:var(--muted)">Ящиков пока нет.</p>')+
+    '<div class="permx" style="padding:12px 0 0;border-top:1px solid var(--line)"><b>Подключить ящик</b>'+
+    '<label class="f">Почта<input class="inp" id="mb-email" type="email" autocomplete="off" placeholder="sales@brocs.kz" data-a="mb-email"></label>'+
+    '<label class="f">Имя отправителя<input class="inp" id="mb-name" maxlength="80" placeholder="Brocs — отдел продаж"></label>'+
+    '<label class="f">Пароль для приложений<input class="inp" id="mb-pass" type="password" autocomplete="new-password"></label>'+
+    '<p class="set-hint" id="mb-hint" style="margin:0">Обычный пароль от почты не подойдёт. Нужен специальный «пароль для приложений» из настроек безопасности почты.</p>'+
+    '<div class="grid2"><label class="f">Сервер IMAP<input class="inp" id="mb-imap" placeholder="imap.mail.ru"></label><label class="f">Порт IMAP<input class="inp num" id="mb-imap-port" type="number" value="993"></label></div>'+
+    '<div class="grid2"><label class="f">Сервер SMTP<input class="inp" id="mb-smtp" placeholder="smtp.mail.ru"></label><label class="f">Порт SMTP<input class="inp num" id="mb-smtp-port" type="number" value="465"></label></div></div>',
+    '<button class="btn" data-a="close">Закрыть</button><button class="btn primary" data-a="mail-box-add">Проверить и подключить</button>') }
 // ---------- Настройки ----------
 const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность']];
 const TIMEZONES=[['Asia/Almaty','(GMT +05:00) Алматы, Астана'],['Asia/Aqtobe','(GMT +05:00) Актобе, Атырау, Актау'],['Asia/Tashkent','(GMT +05:00) Ташкент'],['Asia/Bishkek','(GMT +06:00) Бишкек'],['Europe/Moscow','(GMT +03:00) Москва'],['Asia/Dubai','(GMT +04:00) Дубай'],['Europe/Istanbul','(GMT +03:00) Стамбул']];
@@ -796,7 +871,7 @@ function vSetup(){
 
 // ---------- окна ----------
 function closeOverlay(){ S.overlay=null; $('#overlay').innerHTML='' }
-function openOverlay(o){ S.overlay=o; ({deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
+function openOverlay(o){ S.overlay=o; ({mailcompose:drawMailCompose,mailboxes:drawMailBoxes,deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
 function applyLock(o){ const root=$('#overlay'); applyPerms(root); const ent={deal:'deals',task:'tasks',contact:'contacts',company:'companies'}[o.kind];
   if(!ent||o.isNew||S.overlay!==o) return; const rec=S[ent][o.id]; if(!rec) return; const ed=can(ent,'edit',rec), dl=can(ent,'del',rec);
   root.querySelectorAll('[data-a="deal-del"],[data-a="task-del"],[data-a="contact-del"],[data-a="company-del"]').forEach(b=>{ b.hidden=!dl });
@@ -829,7 +904,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
   const coOpts='<option value="">Клиент не выбран</option>'+vis('companies').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(c=>'<option value="'+esc(c.id)+'"'+(d.company===c.id?' selected':'')+'>'+esc(c.name)+(c.city?' · '+esc(c.city):'')+'</option>').join('')+'<option value="__new">+ Новый клиент…</option>';
   const composer=o.isNew?'<div class="composer"><p style="margin:0;color:var(--muted)">Переписка, примечания и задачи появятся после создания сделки.</p></div>':
    '<div class="composer">'+
-    '<div class="ctabs" role="tablist"><button role="tab" data-a="ctab" data-v="wa" aria-selected="true">WhatsApp</button><button role="tab" data-a="ctab" data-v="note" aria-selected="false">Примечание</button><button role="tab" data-a="ctab" data-v="task" aria-selected="false">Задача</button></div>'+
+    '<div class="ctabs" role="tablist"><button role="tab" data-a="ctab" data-v="wa" aria-selected="true">WhatsApp</button><button role="tab" data-a="ctab" data-v="note" aria-selected="false">Примечание</button><button role="tab" data-a="ctab" data-v="task" aria-selected="false">Задача</button>'+(allowedViews().includes('mail')?'<button type="button" data-a="deal-mail" title="Написать письмо клиенту">✉ Письмо</button>':'')+'</div>'+
     '<div id="cp-wa" class="cpane"><div class="tpls">'+TEMPLATES.map((t,i)=>'<button type="button" data-a="tpl" data-i="'+i+'">'+esc(t[0])+'</button>').join('')+'</div>'+
      '<textarea class="inp" id="waText" rows="2" placeholder="Сообщение клиенту…"></textarea>'+
      '<div class="crow"><span class="waTo" id="waTo"></span><button type="button" class="btn sm" data-a="wa-in">Записать ответ клиента</button><a class="btn sm wa" id="waSend" data-a="wa-send" href="#" target="_blank" rel="noopener">Отправить в WhatsApp</a></div></div>'+
@@ -875,6 +950,8 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
     :'<section class="panel">'+emptyBox('Клиент не выбран','Выберите бренд в поле «Клиент» и сохраните сделку.')+'</section>';
   const items=(d.notes||[]).map(n=>({at:n.at||'',kind:n.kind||(n.sys?'sys':'note'),n}));
   vis('tasks').filter(t=>t.deal===o.id).forEach(t=>items.push({at:t.createdAt||t.due||'',kind:'task',t}));
+  const cEmail=String((S.contacts[d.contact]||{}).email||'').toLowerCase();
+  vis('mail').filter(m=>m.deal===o.id||(cEmail&&String(mailPeer(m).email||'').toLowerCase()===cEmail)).forEach(m=>items.push({at:m.date||'',kind:'mail',m}));
   items.sort((a,b)=>a.at.localeCompare(b.at));
   const wrap=$('#feedWrap'), feed=$('#feed'); if(!feed) return;
   const atBottom=wrap.scrollHeight-wrap.scrollTop-wrap.clientHeight<60;
@@ -885,6 +962,7 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
     if(it.kind==='sys') h+='<div class="ev">'+esc(n.text)+' · '+esc(tm(n.at))+'</div>';
     else if(it.kind==='wa_out') h+='<div class="msg out"><div class="x">'+esc(n.text)+'</div><div class="mt">'+esc(memberName(n.by))+' · '+esc(tm(n.at))+' · WhatsApp</div></div>';
     else if(it.kind==='wa_in') h+='<div class="msg in"><div class="mh">'+esc(n.from||clientName(d))+'</div><div class="x">'+esc(n.text)+'</div><div class="mt">'+esc(tm(n.at))+' · записал '+esc(memberName(n.by))+'</div></div>';
+    else if(it.kind==='mail'){ const m=it.m; h+='<div class="msg '+(m.folder==='out'?'out':'in')+' mailmsg" data-a="mail-goto" data-id="'+esc(m.id)+'"><div class="mh">✉ '+esc(m.subject||'(без темы)')+'</div><div class="x">'+esc(String(m.text||'').slice(0,400))+(String(m.text||'').length>400?'…':'')+'</div><div class="mt">'+esc(fmtTime(m.date))+' · почта · '+esc(m.folder==='out'?'отправлено':'от '+(m.from.name||m.from.email))+'</div></div>' }
     else if(it.kind==='task'){ const t=it.t, b=bucket(t); h+='<div class="fi task'+(t.done?' done':'')+'" data-a="open-task" data-id="'+esc(t.id)+'"><button class="chk" role="checkbox" aria-checked="'+(!!t.done)+'" aria-label="Выполнено" data-a="toggle-task" data-id="'+esc(t.id)+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-10"/></svg></button><div class="grow"><div class="fh">Задача · '+esc(t.type||'Дело')+' · '+esc(memberName(t.owner))+'</div><div class="t">'+esc(t.text)+'</div></div><span class="due num'+(b==='overdue'?' bad':'')+'">'+esc(t.due?fmtDate(t.due,true):'Без срока')+'</span></div>' }
     else h+='<div class="fi note">'+avatar(n.by,'sm')+'<div class="grow"><div class="fh">'+esc(memberName(n.by))+' · '+esc(tm(n.at))+' · примечание</div><div class="x">'+esc(n.text)+'</div></div></div>' });
   feed.innerHTML=h||emptyBox('Переписки пока нет','Напишите клиенту в WhatsApp или добавьте примечание. Всё сохранится здесь, и команда это увидит.');
@@ -1059,6 +1137,33 @@ const A={
   'member-unblock':async el=>{ if(!isBoss()) return; const id=el.dataset.id;
     try{ const j=await api('block',{id,blocked:false}); S.members[id]=j.data; if(S.overlay) closeOverlay(); render(); toast('Доступ возвращён. Сотрудник входит со своим паролем') }catch(e){ toast(e.message) } },
   'set-tab':el=>{ S.setTab=el.dataset.v; render(true) },
+  'mail-sync':()=>syncMail(true),
+  'mail-compose':()=>openOverlay({kind:'mailcompose'}),
+  'mail-boxes':()=>{ if(isBoss()) openOverlay({kind:'mailboxes'}) },
+  'mail-folder':el=>{ S.mailFolder=el.dataset.v; S.mailSel=null; render(true) },
+  'mail-open':el=>{ const id=el.dataset.id; S.mailSel=id; const m=S.mail[id]; if(m&&m.folder==='in'&&!m.seen) put('mail',id,Object.assign({},m,{seen:true})); else render(true) },
+  'mail-goto':el=>{ const m=S.mail[el.dataset.id]; if(!m) return; closeOverlay(); S.mailFolder=m.folder; S.mailSel=el.dataset.id; go('mail') },
+  'mail-reply':el=>{ const m=S.mail[el.dataset.id]; if(!m) return;
+    const quote='\n\n\n'+fmtDate(m.date,true)+', '+(m.from.name||m.from.email)+' пишет:\n'+String(m.text||'').split('\n').map(l=>'> '+l).join('\n');
+    openOverlay({kind:'mailcompose',reply:true,box:m.box,to:m.from.email,subject:/^re:/i.test(m.subject||'')?m.subject:'Re: '+(m.subject||''),text:quote.slice(0,20000),inReplyTo:m.messageId}) },
+  'mail-deal':async el=>{ const m=S.mail[el.dataset.id]; if(!m) return; const p=mailPeer(m); const c=contactByEmail(p.email); let cid=c&&c.id;
+    if(!cid){ cid=newId(); if(!await put('contacts',cid,{name:p.name||p.email,email:p.email,phone:'',company:'',owner:S.me,createdAt:now()})) return }
+    const pid=pipeOf(S.pipe).id, id=newId();
+    const d={title:m.subject||('Письмо от '+(p.name||p.email)),budget:0,pipeline:pid,stage:stagesOf(pid)[0].id,owner:S.me,contact:cid,company:'',tags:['почта'],createdAt:now(),updatedAt:now(),notes:[{sys:true,by:S.me,at:now(),text:'Сделка создана из письма «'+(m.subject||'без темы')+'»'}]};
+    if(await put('deals',id,d)){ toast('Сделка создана'); openOverlay({kind:'deal',id}) } },
+  'mail-send':async()=>{ const o=S.overlay, btn=$('[data-a="mail-send"]'); btn.disabled=true; btn.textContent='Отправляем…';
+    try{ const j=await apiMail('send',{box:($('#mc-box')||{}).value||((S.boxes||[])[0]||{}).id,to:$('#mc-to').value,subject:$('#mc-subj').value,text:$('#mc-text').value,inReplyTo:o.inReplyTo||'',deal:o.deal||''});
+      S.mail[j.id]=j.data; toast('Письмо отправлено'); backOrClose(); render() }
+    catch(e){ toast(e.message); btn.disabled=false; btn.textContent='Отправить' } },
+  'mail-box-add':async()=>{ const btn=$('[data-a="mail-box-add"]'), v=id=>($('#'+id)||{}).value||''; btn.disabled=true; btn.textContent='Проверяем…';
+    try{ const j=await apiMail('add-box',{email:v('mb-email'),name:v('mb-name'),password:v('mb-pass'),imap_host:v('mb-imap'),imap_port:v('mb-imap-port'),smtp_host:v('mb-smtp'),smtp_port:v('mb-smtp-port')});
+      S.boxes=j.boxes; S.mailSyncedAt=0; closeOverlay(); toast('Ящик подключён, загружаем письма'); render(); syncMail(false) }
+    catch(e){ toast(e.message); btn.disabled=false; btn.textContent='Проверить и подключить' } },
+  'mail-box-del':el=>{ const id=el.dataset.id; confirmBox('Отключить этот ящик? Уже загруженные письма останутся в CRM.','Отключить',async()=>{
+    try{ const j=await apiMail('del-box',{id}); S.boxes=j.boxes; if(S.overlay&&S.overlay.kind==='mailboxes') drawMailBoxes(); render(); toast('Ящик отключён') }catch(e){ toast(e.message) } },'') },
+  'deal-mail':async()=>{ const o=S.overlay, d=S.deals[o.id]; if(!d) return; await loadBoxes();
+    if(!(S.boxes||[]).length){ toast(isBoss()?'Сначала подключите ящик: «Почта» → «Почтовые ящики»':'Почта не подключена. Обратитесь к руководителю.'); return }
+    const c=S.contacts[d.contact]; openOverlay({kind:'mailcompose',to:(c&&c.email)||'',subject:d.title||'',deal:o.id,back:{kind:'deal',id:o.id}}) },
   'ip-add-mine':()=>addIp(S.myIp),
   'ip-add':()=>{ const i=$('#ip-new'); addIp(i.value.trim()) },
   'ip-del':el=>{ const s=secCfg(); saveConfig('security',{ips:s.ips.filter(x=>x!==el.dataset.v)}) },
@@ -1099,10 +1204,11 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
+  else if(a==='mb-email'){ const p=mailPreset(el.value); if(p){ $('#mb-imap').value=p[2]; $('#mb-imap-port').value=p[3]; $('#mb-smtp').value=p[4]; $('#mb-smtp-port').value=p[5]; $('#mb-hint').textContent='Это '+p[1]+'. Пароль для приложений создаётся здесь: '+p[6]+'.' } }
   else if(a==='gen-set'){ const k=el.dataset.k; let v=el.value; if(k==='hour12') v=v==='true'; if(k==='account') v=v.trim().slice(0,60);
     saveConfig('general',{[k]:v}).then(ok=>{ if(ok){ toast('Сохранено'); el.blur(); render(true) } }) }
   else if(a==='menu-set'){ const rid=el.dataset.r, v=el.dataset.v, on=el.checked;
-    saveRole(rid,r=>{ const m=roleMenu(r).filter(x=>x!==v); if(on) m.push(v); r.menu=m; r.reports=m.includes('reports') }).then(()=>toast('Меню обновлено')) }
+    saveRole(rid,r=>{ const m=roleMenu(r).filter(x=>x!==v); if(on) m.push(v); r.menu=m; r.reports=m.includes('reports'); r.mail=m.includes('mail') }).then(()=>toast('Меню обновлено')) }
   else if(a==='sec-ip'){ const s=secCfg(), on=el.checked; const patch={ipEnabled:on};
     if(on&&!s.ips.length&&S.myIp&&/[.:]/.test(S.myIp)) patch.ips=[S.myIp];
     saveConfig('security',patch).then(ok=>{ if(ok) toast(on?(patch.ips?'Белый список включён, ваш IP добавлен':'Белый список включён'):'Белый список выключен') }) }
