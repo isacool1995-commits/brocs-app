@@ -54,6 +54,11 @@ module.exports = async (req, res) => {
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const now = new Date().toISOString();
 
+  if (b.action === 'myip') {
+    const ip = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '').split(',')[0].trim();
+    return res.json({ ip });
+  }
+
   // ---- Действия без входа: первый запуск и восстановление пароля руководителя ----
   if (b.action === 'setup-status' || b.action === 'setup' || b.action === 'forgot') {
     const all = await sb('/rest/v1/docs?col=eq.members&select=id,data');

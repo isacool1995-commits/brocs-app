@@ -114,7 +114,7 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:70
 .panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 @media (max-width:980px){.panels{grid-template-columns:1fr}}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
-.panel>header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.panel>header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .panel>header h2{font-size:15px;font-weight:800;margin-right:auto}
 .panel .body{padding:6px 0}
 .empty{padding:22px 16px;color:var(--muted);text-align:center}
@@ -253,6 +253,19 @@ td.r,th.r{text-align:right}
 .stage-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .stage-row:last-child{border-bottom:0}
 .stage-row .inp{flex:1;min-width:160px}
+.settings{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
+.set-nav{display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:6px}
+.set-nav button{text-align:left;border:0;background:transparent;padding:10px 12px;border-radius:8px;font-weight:700;color:var(--muted);white-space:nowrap}
+.set-nav button:hover{background:var(--surface-2);color:var(--fg)}
+.set-nav button[aria-current="true"]{background:var(--accent-soft);color:var(--accent)}
+.set-body{min-width:0;display:flex;flex-direction:column;gap:16px}
+.set-grid{padding:4px 16px;display:flex;flex-direction:column}
+.set-row{display:grid;grid-template-columns:190px minmax(0,360px);gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-weight:600}
+.set-row:last-child{border-bottom:0}
+.set-hint{color:var(--muted);font-size:12.5px;margin:8px 16px 14px}
+.menu-tbl td,.menu-tbl th{text-align:center} .menu-tbl td:first-child,.menu-tbl th:first-child{text-align:left}
+.menu-tbl input{width:18px;height:18px;accent-color:var(--accent)}
+@media (max-width:760px){.settings{grid-template-columns:minmax(0,1fr)}.set-nav{flex-direction:row;overflow-x:auto}.set-row{grid-template-columns:minmax(0,1fr)}}
 .pipes{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
 .pipes .btn{flex:none}
 table.perm{min-width:680px}
@@ -349,9 +362,13 @@ const ICONS={
   contacts:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   reports:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
   team:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
-  setup:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
+  setup:'<path d="M3 5h18l-7 8v6l-4-2v-4Z"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 };
-const VIEWS=[['home','Рабочий стол'],['deals','Сделки'],['tasks','Задачи'],['contacts','Клиенты'],['reports','Аналитика'],['team','Команда'],['setup','Воронки']];
+const VIEWS=[['home','Рабочий стол'],['deals','Сделки'],['tasks','Задачи'],['contacts','Клиенты'],['reports','Аналитика'],['setup','Воронки'],['settings','Настройки']];
+const ADMIN_VIEWS=['setup','settings'];
+function roleMenu(r){ return Array.isArray(r.menu)?r.menu:['home','deals','tasks','contacts'].concat(r.reports?['reports']:[]) }
+function allowedViews(){ if(isBoss()) return VIEWS.map(v=>v[0]); const m=roleMenu(myRole()); return VIEWS.map(v=>v[0]).filter(k=>!ADMIN_VIEWS.includes(k)&&(k==='home'||m.includes(k))) }
 const DEFAULT_STAGES=[
   {id:'s_new',name:'Новая заявка',color:'#5B7CE6'},
   {id:'s_qual',name:'Выявление потребности',color:'#2BA3C4'},
@@ -362,7 +379,7 @@ const DEFAULT_STAGES=[
 const PALETTE=['#5B7CE6','#2BA3C4','#1C9E7E','#7DB547','#D59A1F','#E0703A','#D2504B','#B865D6','#7A869A'];
 const WON='won', LOST='lost';
 const TASK_TYPES=['Звонок','Встреча','Письмо','Дело'];
-const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles'];
+const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config'];
 const FORMS=['ИП','ТОО','Другое'];
 const TAX=['Общеустановленный режим','Не общеустановленный (спецрежим)'];
 const PAYERS=['Юридическое лицо','Физическое лицо'];
@@ -370,7 +387,7 @@ const PAYS=['Kaspi Gold','Рассрочка','Счёт на юрлицо'];
 const opts=(arr,v)=>'<option value="">Не указано</option>'+arr.map(x=>'<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>').join('');
 
 let savedPipe='main'; try{ savedPipe=localStorage.getItem('broks.pipe')||'main' }catch(e){}
-const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},roleSel:'r_manager',stages:null,me:null,owner:false,pipe:savedPipe,
+const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},config:{},roleSel:'r_manager',setTab:'general',myIp:null,stages:null,me:null,owner:false,pipe:savedPipe,
   mode:'starting',view:'home',q:'',dealsMode:'board',dealsOwner:'all',dealsStatus:'open',taskFilter:'mine',
   contactTab:'companies',period:'month',overlay:null};
 let db=null, users=null;
@@ -380,7 +397,11 @@ let pendingRender=false, joined=false;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const nf=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0});
-const rub=n=>nf.format(+n||0)+' ₸';
+const CURRENCIES=[['KZT','Казахский тенге','₸'],['UZS','Узбекский сум','сум'],['RUB','Российский рубль','₽'],['USD','Доллар США','$']];
+function gen(){ return Object.assign({account:'',tz:'Asia/Almaty',dateFmt:'short',hour12:false,currency:'KZT'},(S.config&&S.config.general)||{}) }
+function secCfg(){ const s=Object.assign({ipEnabled:false,ips:[]},(S.config&&S.config.security)||{}); if(!Array.isArray(s.ips)) s.ips=[]; return s }
+const curSym=()=>(CURRENCIES.find(c=>c[0]===gen().currency)||CURRENCIES[0])[2];
+const rub=n=>nf.format(+n||0)+' '+curSym();
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const now=()=>new Date().toISOString();
 const icon=(k)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[k]+'</svg>';
@@ -428,9 +449,18 @@ async function ensureDepts(){ if(list('depts').length) return true; for(const [i
 const isOpen=d=>d.stage!==WON&&d.stage!==LOST;
 const list=col=>Object.entries(S[col]).map(([id,v])=>Object.assign({id},v));
 
-function fmtDate(iso,withTime){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return '';
-  const o={day:'numeric',month:'short'}; if(d.getFullYear()!==new Date().getFullYear()) o.year='numeric';
-  let s=d.toLocaleDateString('ru-RU',o); if(withTime) s+=', '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); return s }
+function tzOpt(){ const tz=gen().tz; try{ new Intl.DateTimeFormat('ru-RU',{timeZone:tz}); return {timeZone:tz} }catch(e){ return {} } }
+function fmtTime(iso){ const d=new Date(iso); if(isNaN(d)) return ''; const h12=!!gen().hour12;
+  return d.toLocaleTimeString(h12?'en-US':'ru-RU',Object.assign({hour:'2-digit',minute:'2-digit',hour12:h12},tzOpt())) }
+function fmtDate(iso,withTime){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; let s;
+  if(gen().dateFmt==='num') s=d.toLocaleDateString('ru-RU',Object.assign({day:'2-digit',month:'2-digit',year:'numeric'},tzOpt()));
+  else { const o=Object.assign({day:'numeric',month:'short'},tzOpt()); if(d.getFullYear()!==new Date().getFullYear()) o.year='numeric'; s=d.toLocaleDateString('ru-RU',o) }
+  if(withTime) s+=', '+fmtTime(iso); return s }
+function download(name,text,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:type+';charset=utf-8'})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove() },1000) }
+function saveConfig(id,patch){ return put('config',id,Object.assign({},(S.config&&S.config[id])||{},patch)) }
+function addIp(ip){ ip=String(ip||'').trim(); if(!/^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-f:]{3,}$/i.test(ip)){ toast('Проверьте адрес: например 5.76.250.4'); return }
+  const s=secCfg(); if(s.ips.includes(ip)){ toast('Этот адрес уже в списке'); return } saveConfig('security',{ips:s.ips.concat([ip])}).then(ok=>{ if(ok) toast('Адрес добавлен') }) }
+function loadMyIp(){ if(S.myIp!=null||!sb) return; S.myIp=''; apiPublic('myip').then(j=>{ S.myIp=j.ip||'не определён'; render() }).catch(()=>{ S.myIp='не определён'; render() }) }
 function toLocalInput(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()) }
 function dayStart(off){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+(off||0)); return d }
@@ -479,7 +509,7 @@ async function loadAll(){ const fresh={}; COLS.forEach(c=>{ fresh[c]={} }); let 
     if(error) return false;
     data.forEach(r=>{ if(fresh[r.col]) fresh[r.col][r.id]=r.data; else if(r.col==='config'&&r.id==='pipeline') stagesCfg=r.data.stages||null });
     if(data.length<1000) break }
-  COLS.forEach(c=>{ S[c]=fresh[c] }); S.stages=stagesCfg; return true }
+  COLS.forEach(c=>{ S[c]=fresh[c] }); S.stages=(S.config.pipeline||{}).stages||stagesCfg; return true }
 let reloadT=null;
 function reloadSoon(){ clearTimeout(reloadT); reloadT=setTimeout(()=>{ loadAll().then(ok=>{ if(ok) render() }) },400) }
 function subscribe(){
@@ -543,7 +573,7 @@ async function logout(){ try{ await sb.auth.signOut() }catch(e){} location.reloa
 function offline(){ S.mode='local'; S.me='local'; S.members={local:{name:'Вы',role:'Руководитель',access:'r_admin',createdAt:now()}}; render() }
 
 // ---------- навигация ----------
-function readHash(){ const h=(location.hash||'').slice(1); if(VIEWS.some(v=>v[0]===h)) S.view=h }
+function readHash(){ const h=(location.hash||'').slice(1); if(h==='team'){ S.view='settings'; S.setTab='users'; return } if(VIEWS.some(v=>v[0]===h)) S.view=h }
 window.addEventListener('hashchange',()=>{ readHash(); render(true) });
 function go(v){ S.view=v; try{ history.replaceState(null,'','#'+v) }catch(e){} render(true); window.scrollTo(0,0) }
 
@@ -553,8 +583,9 @@ function render(force){
   if(!force&&a&&main.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ pendingRender=true; return }
   pendingRender=false;
   const overdue=vis('tasks').filter(t=>t.owner===S.me&&bucket(t)==='overdue').length;
-  if((S.view==='setup'&&!isBoss())||(S.view==='reports'&&!myRole().reports&&S.mode==='live')) S.view='home';
-  $('#nav').innerHTML=VIEWS.filter(([k])=>(k!=='setup'||isBoss())&&(k!=='reports'||myRole().reports)).map(([k,l])=>'<a href="#'+k+'" data-a="nav" data-v="'+k+'" title="'+l+'" aria-label="'+l+'"'+(S.view===k?' aria-current="page"':'')+'>'+icon(k)+'<span class="lbl">'+l+'</span>'+(k==='tasks'&&overdue?'<span class="cnt num">'+overdue+'</span>':'')+'</a>').join('');
+  const av=allowedViews(); if(S.mode==='live'&&!av.includes(S.view)) S.view=av[0]||'home';
+  const g=gen(); const bs=document.querySelector('.brand small'); if(bs) bs.textContent=g.account||'CRM команды'; document.title=(g.account?g.account+' · ':'')+'Брокс CRM';
+  $('#nav').innerHTML=VIEWS.filter(([k])=>av.includes(k)).map(([k,l])=>'<a href="#'+k+'" data-a="nav" data-v="'+k+'" title="'+l+'" aria-label="'+l+'"'+(S.view===k?' aria-current="page"':'')+'>'+icon(k)+'<span class="lbl">'+l+'</span>'+(k==='tasks'&&overdue?'<span class="cnt num">'+overdue+'</span>':'')+'</a>').join('');
   const n=team().length;
   $('#railfoot').innerHTML=(S.mode==='live'?'<span><i class="dot" style="background:var(--ok)"></i>Данные общие для команды</span>':S.mode==='local'?'<span><i class="dot" style="background:var(--warn)"></i>Пробный режим</span>':'<span><i class="dot" style="background:var(--muted)"></i>Подключение…</span>')+'<span>В команде: <b class="num">'+n+'</b></span>';
   $('#me').innerHTML=S.me?avatar(S.me)+'<span>'+esc(memberName(S.me))+'</span>'+(sb?'<button class="btn sm ghost" data-a="logout">Выйти</button>':''):'';
@@ -566,7 +597,7 @@ function render(force){
   let html='';
   if(S.mode==='local') html+='<div class="notice warn">Пробный режим: сервер не подключён к базе, изменения не сохраняются. Проверьте ключи Supabase в настройках Vercel.</div>';
   if(S.mode==='slow') html+='<div class="notice warn">База пока не отвечает. Данные появятся, как только восстановится связь.</div>';
-  html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup}[S.view])();
+  html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup,settings:vSettings}[S.view])();
   main.innerHTML=html; applyPerms(main);
   if(S.overlay&&S.overlay.kind==='deal'&&!S.overlay.isNew){ renderDealLive(); updateWa() }
 }
@@ -661,7 +692,7 @@ function vContacts(){
   return h+'<div class="tablewrap"><table style="min-width:900px"><thead><tr><th>Бренд</th><th>Город</th><th>ИП / ТОО</th><th>Режим</th><th>Кто платит</th><th>Оплата</th><th class="r">Сделок</th></tr></thead><tbody>'+cos.map(c=>'<tr data-a="open-company" data-id="'+esc(c.id)+'"><td><b>'+esc(c.name)+'</b>'+(c.bin?'<div class="num" style="color:var(--muted);font-size:12.5px">БИН/ИИН '+esc(c.bin)+'</div>':'')+'</td><td>'+dash(c.city)+'</td><td>'+dash(c.form)+'</td><td>'+(c.tax?'<span class="pill'+(c.tax===TAX[0]?' warn':'')+'">'+esc(c.tax===TAX[0]?'Общеустановленный':'Спецрежим')+'</span>':dash(''))+'</td><td>'+dash(c.payer)+'</td><td>'+(c.pay?'<span class="tag">'+esc(c.pay)+'</span>':dash(''))+'</td><td class="r num">'+dealsOf('company',c.id).length+'</td></tr>').join('')+'</tbody></table></div>' }
 
 function vReports(){
-  if(!myRole().reports) return '<div class="vh"><h1>Аналитика</h1></div><div class="panel">'+emptyBox('Раздел недоступен','Доступ к аналитике открывает руководитель.')+'</div>';
+  if(!allowedViews().includes('reports')) return '<div class="vh"><h1>Аналитика</h1></div><div class="panel">'+emptyBox('Раздел недоступен','Доступ к аналитике открывает руководитель.')+'</div>';
   const from={month:(()=>{const d=dayStart();d.setDate(1);return d})(),quarter:(()=>{const d=dayStart();d.setDate(1);d.setMonth(Math.floor(d.getMonth()/3)*3);return d})(),year:(()=>{const d=dayStart();d.setMonth(0,1);return d})(),all:new Date(0)}[S.period];
   const deals=vis('deals'), open=deals.filter(isOpen);
   const closed=deals.filter(d=>!isOpen(d)&&d.closedAt&&new Date(d.closedAt)>=from);
@@ -693,6 +724,48 @@ function vTeam(){
   const rest=ms.filter(m=>!known.has(m.dept)); if(rest.length) h+=group('Без отдела',rest,null);
   if(boss) h+=rolesPanel();
   return h }
+// ---------- Настройки ----------
+const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность']];
+const TIMEZONES=[['Asia/Almaty','(GMT +05:00) Алматы, Астана'],['Asia/Aqtobe','(GMT +05:00) Актобе, Атырау, Актау'],['Asia/Tashkent','(GMT +05:00) Ташкент'],['Asia/Bishkek','(GMT +06:00) Бишкек'],['Europe/Moscow','(GMT +03:00) Москва'],['Asia/Dubai','(GMT +04:00) Дубай'],['Europe/Istanbul','(GMT +03:00) Стамбул']];
+function vSettings(){
+  if(!isBoss()) return '<div class="vh"><h1>Настройки</h1></div><div class="panel">'+emptyBox('Раздел недоступен','Настройки меняет администратор.')+'</div>';
+  const t=SET_TABS.some(x=>x[0]===S.setTab)?S.setTab:'general';
+  return '<div class="settings"><nav class="set-nav" aria-label="Разделы настроек">'+SET_TABS.map(([k,l])=>'<button data-a="set-tab" data-v="'+k+'" aria-current="'+(t===k)+'">'+l+'</button>').join('')+'</nav><div class="set-body">'+({general:vSetGeneral,users:vSetUsers,security:vSetSecurity}[t])()+'</div></div>' }
+function vSetGeneral(){ const g=gen();
+  const sel=(k,opts,v)=>'<select class="inp" id="g-'+k+'" data-a="gen-set" data-k="'+k+'">'+opts.map(([a,b])=>'<option value="'+esc(a)+'"'+(String(v)===String(a)?' selected':'')+'>'+esc(b)+'</option>').join('')+'</select>';
+  const row=(l,c)=>'<label class="set-row"><span>'+l+'</span>'+c+'</label>';
+  let h='<div class="vh"><h1>Общие настройки</h1></div>';
+  h+='<section class="panel"><header><h2>Основные настройки</h2></header><div class="set-grid">'+
+    row('Название аккаунта','<input class="inp" id="g-account" data-a="gen-set" data-k="account" maxlength="60" value="'+esc(g.account)+'" placeholder="Например: Brocs">')+
+    row('Часовой пояс',sel('tz',TIMEZONES,g.tz))+
+    row('Формат даты',sel('dateFmt',[['short','12 нояб. 2026'],['num','12.11.2026']],g.dateFmt))+
+    row('Формат времени',sel('hour12',[['false','24 часа'],['true','12 часов (AM/PM)']],g.hour12))+
+    row('Валюта',sel('currency',CURRENCIES.map(c=>[c[0],c[1]+', '+c[2]]),g.currency))+
+    '</div><p class="set-hint">Так сейчас выглядят дата и сумма: <b>'+esc(fmtDate(now(),true))+'</b> · <b>'+esc(rub(150000))+'</b>. Настройки действуют для всей команды.</p></section>';
+  const rs=roles().filter(r=>!r.manage), cols=VIEWS.filter(([k])=>!ADMIN_VIEWS.includes(k));
+  h+='<section class="panel"><header><h2>Меню по ролям</h2></header><p class="set-hint" style="margin-top:12px">Отметьте, какие разделы видит каждый профиль доступа. Администратор видит всё, «Воронки» и «Настройки» доступны только ему.</p><div style="overflow-x:auto"><table class="perm menu-tbl"><thead><tr><th>Профиль</th>'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr></thead><tbody>'+
+    rs.map(r=>{ const m=roleMenu(r); return '<tr><td><b>'+esc(r.name)+'</b></td>'+cols.map(([k,l])=>'<td><input type="checkbox" id="mn-'+esc(r.id)+'-'+k+'" data-a="menu-set" data-r="'+esc(r.id)+'" data-v="'+k+'"'+(k==='home'||m.includes(k)?' checked':'')+(k==='home'?' disabled title="Рабочий стол виден всегда"':'')+' aria-label="'+esc(r.name)+': '+l+'"></td>').join('')+'</tr>' }).join('')+
+    '</tbody></table></div></section>';
+  return h }
+function vSetUsers(){ const ms=list('members').sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  let h='<div class="vh"><h1>Пользователи</h1><button class="btn" data-a="dept-add">+ Отдел</button><button class="btn primary" data-a="new-member">+ Добавить пользователя</button></div>';
+  h+='<p class="notice" style="margin:0">Пользователей добавляете только вы: укажите почту и придумайте пароль, затем передайте их сотруднику. Сменить пароль, отдел или профиль доступа и закрыть доступ можно, нажав на пользователя. Сам сотрудник пароль не меняет.</p>';
+  h+='<div class="tablewrap"><table style="min-width:760px"><thead><tr><th>Имя</th><th>Отдел</th><th>Почта</th><th>Дата добавления</th><th>Профиль доступа</th><th>Статус</th></tr></thead><tbody>'+ms.map(m=>{ const d=departments().find(x=>x.id===m.dept);
+    return '<tr data-a="open-member" data-id="'+esc(m.id)+'"><td><span style="display:inline-flex;align-items:center;gap:8px">'+avatar(m.id,'sm')+'<b>'+esc(memberName(m.id))+'</b>'+(m.id===S.me?' <span class="pill">это вы</span>':'')+'</span></td><td>'+esc(d?d.name:'—')+'</td><td>'+esc(m.email||'—')+'</td><td class="num">'+esc(fmtDate(m.createdAt))+'</td><td>'+esc(roleOfMember(m.id).name)+'</td><td>'+(m.blocked?'<span class="pill bad">Доступ закрыт</span>':'<span class="pill ok">Активен</span>')+'</td></tr>' }).join('')+'</tbody></table></div>';
+  h+='<section class="panel"><header><h2>Отделы</h2><span class="pill num">'+departments().length+'</span></header><div class="body">'+departments().map(d=>{ const n=team().filter(m=>m.dept===d.id).length;
+    return '<div class="row" data-a="open-dept" data-id="'+esc(d.id)+'"><div class="grow"><div class="t">'+esc(d.name)+'</div><div class="m">'+n+' '+plural(n,'сотрудник','сотрудника','сотрудников')+'</div></div><span class="btn sm ghost">Изменить</span></div>' }).join('')+'</div></section>';
+  return h+rolesPanel() }
+function vSetSecurity(){ const s=secCfg(); loadMyIp();
+  let h='<div class="vh"><h1>Безопасность</h1></div>';
+  h+='<section class="panel"><header><h2>Белый список IP-адресов</h2><label class="chk-l"><input type="checkbox" id="sec-ip" data-a="sec-ip"'+(s.ipEnabled?' checked':'')+'> Включён</label></header><div class="permx" style="border-top:0">'+
+    '<p class="set-hint" style="margin:0">Список разрешает сотрудникам работать в CRM только с указанных IP-адресов, например из офиса. С других адресов они увидят «Нет доступа». Проверка идёт на сервере. На администратора ограничение не действует, поэтому вы себя не заблокируете. Учтите: у некоторых провайдеров IP-адрес меняется со временем.</p>'+
+    '<p style="margin:0">Ваш текущий IP: <b class="num">'+esc(S.myIp||'определяю…')+'</b> '+(S.myIp&&/[.:]/.test(S.myIp)&&!s.ips.includes(S.myIp)?'<button class="btn sm" data-a="ip-add-mine">Добавить в список</button>':'')+'</p>'+
+    '<div class="crow"><input class="inp" id="ip-new" placeholder="Например: 5.76.250.4" style="flex:1;min-width:0;max-width:280px" aria-label="IP-адрес"><button class="btn sm primary" data-a="ip-add">Добавить адрес</button></div>'+
+    (s.ips.length?'<div class="chips">'+s.ips.map(ip=>'<span class="chk-l num" style="cursor:default">'+esc(ip)+'<button class="btn sm ghost" style="height:22px;padding:0 6px" data-a="ip-del" data-v="'+esc(ip)+'" aria-label="Удалить '+esc(ip)+'">✕</button></span>').join('')+'</div>':'<p class="set-hint" style="margin:0">Список пуст.</p>')+
+    (s.ipEnabled&&!s.ips.length?'<p class="notice warn" style="margin:0">Список включён, но в нём нет адресов: сейчас сотрудники не видят никаких данных.</p>':'')+
+    '</div></section>';
+  h+='<section class="panel"><header><h2>Резервное копирование</h2></header><div class="permx" style="border-top:0"><p class="set-hint" style="margin:0">Скачайте все данные CRM одним файлом: сделки, клиентов, задачи, воронки, отделы и права. Сделки можно отдельно выгрузить таблицей для Excel. Храните копию в надёжном месте.</p><div class="crow"><button class="btn primary" data-a="backup-json">Скачать все данные</button><button class="btn" data-a="backup-csv">Сделки в Excel (CSV)</button></div></div></section>';
+  return h }
 function rolesPanel(){ const rs=roles(); const sel=rs.find(r=>r.id===S.roleSel)||rs[0]; const adm=sel.id==='r_admin';
   let h='<div class="vh" style="margin-top:8px"><h2 style="font-size:19px;font-weight:800;margin-right:auto">Права доступа</h2><button class="btn" data-a="role-add">+ Профиль</button></div>';
   h+='<div class="pipes">'+rs.map(r=>'<button class="btn sm'+(r.id===sel.id?' primary':'')+'" data-a="role-pick" data-v="'+esc(r.id)+'">'+esc(r.name)+' <span class="num" style="opacity:.7">'+team().filter(m=>roleOfMember(m.id).id===r.id).length+'</span></button>').join('')+'</div>';
@@ -702,7 +775,7 @@ function rolesPanel(){ const rs=roles(); const sel=rs.find(r=>r.id===S.roleSel)|
       return '<td><select class="inp lv-'+v+'" id="perm-'+e+'-'+a+'" data-a="perm" data-e="'+e+'" data-k="'+a+'" aria-label="'+l+': '+al+'"'+(adm?' disabled':'')+'>'+lv.map(x=>'<option value="'+x[0]+'"'+(x[0]===v?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></td>' }).join('')+'</tr>').join('')+'</tbody></table></div>';
   if(!adm){ const allP=!Array.isArray(sel.pipes);
     h+='<div class="permx"><b>Доступ к воронкам</b><div class="chips">'+pipelines().map(p=>'<label class="chk-l"><input type="checkbox" id="rp-'+esc(p.id)+'" data-a="role-pipe" data-v="'+esc(p.id)+'"'+((allP||sel.pipes.includes(p.id))?' checked':'')+'> '+esc(p.name)+'</label>').join('')+'</div>'+
-      '<b>Разделы</b><div class="chips"><label class="chk-l"><input type="checkbox" id="rf-reports" data-a="role-flag" data-k="reports"'+(sel.reports?' checked':'')+'> Аналитика</label></div>'+
+      '<span style="color:var(--muted);font-size:12.5px">Какие разделы меню видит профиль, настраивается во вкладке «Общие настройки» → «Меню по ролям».</span>'+
       '<span style="color:var(--muted);font-size:12.5px">«Если ответственный»: только записи, где сотрудник указан ответственным. «Для отдела»: записи всех сотрудников его отдела.</span></div>' }
   return h+'</section>' }
 async function saveRole(id,mutate){ if(!await ensureRoles()) return; const base=roles().find(x=>x.id===id); if(!base) return; const r=JSON.parse(JSON.stringify(base)); mutate(r); delete r.id; await put('roles',id,r) }
@@ -771,7 +844,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
     '<div id="stageBar"></div>'+
     '<form class="dform" id="dealForm">'+
      '<label class="f">Воронка<select class="inp" id="d-pipe" data-a="pipe-sel">'+pipelines().filter(p=>pipeOk(p.id)||p.id===o.pipe).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===o.pipe?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
-     '<div class="grid2"><label class="f">Бюджет, ₸<input class="inp num" id="d-budget" type="number" min="0" step="1" value="'+esc(d.budget)+'" placeholder="0"></label><label class="f">Этап<select class="inp" id="d-stage" data-a="stage-sel">'+stOpts+'</select></label></div>'+
+     '<div class="grid2"><label class="f">Бюджет, '+curSym()+'<input class="inp num" id="d-budget" type="number" min="0" step="1" value="'+esc(d.budget)+'" placeholder="0"></label><label class="f">Этап<select class="inp" id="d-stage" data-a="stage-sel">'+stOpts+'</select></label></div>'+
      '<label class="f">Ответственный<select class="inp" id="d-owner">'+memberOptions(d.owner,true)+'</select></label>'+
      '<label class="f">Клиент (бренд)<select class="inp" id="d-company" data-a="sel-new" data-t="d-newco">'+coOpts+'</select></label>'+
      '<div id="d-newco" hidden><label class="f">Название бренда<input class="inp" id="d-nco-name"></label></div>'+
@@ -806,7 +879,7 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
   const wrap=$('#feedWrap'), feed=$('#feed'); if(!feed) return;
   const atBottom=wrap.scrollHeight-wrap.scrollTop-wrap.clientHeight<60;
   let day='', h='';
-  const tm=iso=>new Date(iso).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  const tm=iso=>fmtTime(iso);
   items.forEach(it=>{ const dd=it.at?fmtDate(it.at):''; if(dd&&dd!==day){ day=dd; h+='<div class="day">'+esc(dd)+'</div>' }
     const n=it.n;
     if(it.kind==='sys') h+='<div class="ev">'+esc(n.text)+' · '+esc(tm(n.at))+'</div>';
@@ -901,7 +974,7 @@ function drawMember(){ const o=S.overlay; const m=o.isNew?{name:'',role:'Мен�
    '<label class="f">Профиль доступа<select class="inp" id="m-access"'+(self?' disabled':'')+'>'+roles().map(x=>'<option value="'+esc(x.id)+'"'+(x.id===r.id?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></label>'+
    (self?'<p style="margin:0;color:var(--muted);font-size:12.5px">Свой профиль доступа поменять нельзя, чтобы случайно не потерять права администратора.</p>':'')+
    (o.isNew||S.mode==='local'?'':'<div class="permx" style="padding:12px 0 0;border-top:1px solid var(--line)"><b>Новый пароль</b><div class="crow"><input class="inp" id="m-newpass" type="text" autocomplete="off" style="flex:1;min-width:0" placeholder="Не меньше 6 символов"><button type="button" class="btn sm" data-a="gen-pass" data-t="m-newpass">Придумать</button><button type="button" class="btn sm primary" data-a="member-pass">Сменить пароль</button></div><span style="color:var(--muted);font-size:12.5px">Старый пароль перестанет работать сразу. Передайте новый сотруднику.</span></div>'),
-   (o.isNew||self?'':'<button class="btn danger" data-a="member-del">'+(m.blocked?'':'Закрыть доступ')+'</button>')+'<button class="btn" data-a="close">Отмена</button><button class="btn primary" data-a="member-save">'+(o.isNew?'Создать сотрудника':'Сохранить')+'</button>') }
+   (o.isNew||self?'':m.blocked?'<button class="btn" data-a="member-unblock" data-id="'+esc(o.id)+'">Вернуть доступ</button>':'<button class="btn danger" data-a="member-del">Закрыть доступ</button>')+'<button class="btn" data-a="close">Отмена</button><button class="btn primary" data-a="member-save">'+(o.isNew?'Создать сотрудника':'Сохранить')+'</button>') }
 async function saveMember(){ const o=S.overlay; const name=$('#m-name').value.trim(); if(!name){ toast('Введите имя сотрудника'); $('#m-name').focus(); return }
   const dept=$('#m-dept').value, access=$('#m-access').value;
   if(o.isNew&&sb){ const email=$('#m-email').value.trim(), password=$('#m-pass').value;
@@ -984,7 +1057,17 @@ const A={
     confirmBox('Закрыть доступ для «'+memberName(id)+'»? Он больше не сможет войти. Его сделки и задачи останутся, вернуть доступ можно в любой момент.','Закрыть доступ',async()=>{
       try{ const j=await api('block',{id,blocked:true}); S.members[id]=j.data; render(); closeOverlay(); toast('Доступ закрыт') }catch(e){ toast(e.message) } },'') },
   'member-unblock':async el=>{ if(!isBoss()) return; const id=el.dataset.id;
-    try{ const j=await api('block',{id,blocked:false}); S.members[id]=j.data; render(); toast('Доступ возвращён. Сотрудник входит со своим паролем') }catch(e){ toast(e.message) } },
+    try{ const j=await api('block',{id,blocked:false}); S.members[id]=j.data; if(S.overlay) closeOverlay(); render(); toast('Доступ возвращён. Сотрудник входит со своим паролем') }catch(e){ toast(e.message) } },
+  'set-tab':el=>{ S.setTab=el.dataset.v; render(true) },
+  'ip-add-mine':()=>addIp(S.myIp),
+  'ip-add':()=>{ const i=$('#ip-new'); addIp(i.value.trim()) },
+  'ip-del':el=>{ const s=secCfg(); saveConfig('security',{ips:s.ips.filter(x=>x!==el.dataset.v)}) },
+  'backup-json':()=>{ const out={exportedAt:now(),app:'Брокс CRM'}; COLS.forEach(c=>{ out[c]=S[c] });
+    download('broks-backup-'+now().slice(0,10)+'.json',JSON.stringify(out,null,2),'application/json'); toast('Файл с данными скачан') },
+  'backup-csv':()=>{ const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const rows=[['Сделка','Воронка','Этап','Бюджет','Ответственный','Клиент','Город','Контакт','Телефон','Создана','Обновлена']].concat(list('deals').map(d=>{ const co=S.companies[d.company]||{}, c=S.contacts[d.contact]||{};
+      return [d.title,pipeOf(dealPipe(d)).name,stageOf(d.stage).name,d.budget||0,memberName(d.owner),co.name,co.city,c.name,c.phone||co.phone,fmtDate(d.createdAt,true),fmtDate(d.updatedAt,true)] }));
+    download('broks-sdelki-'+now().slice(0,10)+'.csv','﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n'),'text/csv'); toast('Таблица сделок скачана') },
   'member-pass':async()=>{ const id=S.overlay.id, inp=$('#m-newpass'), p=inp.value; if(p.length<6){ toast('Пароль должен быть не короче 6 символов'); inp.focus(); return }
     try{ await api('password',{id,password:p}); inp.value=''; toast('Пароль изменён. Передайте его сотруднику') }catch(e){ toast(e.message) } },
   'gen-pass':el=>{ const i=$('#'+(el.dataset.t||'m-pass')); if(i){ i.value=genPass(); i.focus(); i.select() } },
@@ -1016,6 +1099,13 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
+  else if(a==='gen-set'){ const k=el.dataset.k; let v=el.value; if(k==='hour12') v=v==='true'; if(k==='account') v=v.trim().slice(0,60);
+    saveConfig('general',{[k]:v}).then(ok=>{ if(ok){ toast('Сохранено'); el.blur(); render(true) } }) }
+  else if(a==='menu-set'){ const rid=el.dataset.r, v=el.dataset.v, on=el.checked;
+    saveRole(rid,r=>{ const m=roleMenu(r).filter(x=>x!==v); if(on) m.push(v); r.menu=m; r.reports=m.includes('reports') }).then(()=>toast('Меню обновлено')) }
+  else if(a==='sec-ip'){ const s=secCfg(), on=el.checked; const patch={ipEnabled:on};
+    if(on&&!s.ips.length&&S.myIp&&/[.:]/.test(S.myIp)) patch.ips=[S.myIp];
+    saveConfig('security',patch).then(ok=>{ if(ok) toast(on?(patch.ips?'Белый список включён, ваш IP добавлен':'Белый список включён'):'Белый список выключен') }) }
   else if(a==='pipe-sel'){ const o=S.overlay; o.pipe=el.value; const d=o.isNew?null:S.deals[o.id]; const cur=d&&dealPipe(d)===el.value?d.stage:stagesOf(el.value)[0].id;
     const s=$('#d-stage'); s.innerHTML=stageOptions(el.value,cur); s.value=cur; renderStageBar(cur) }
   else if(a==='pipe-name'){ const v=el.value.trim(); const p=pipeOf(S.pipe); if(!v){ el.value=p.name; return } savePipe(p,{name:v.slice(0,60)}) }

@@ -110,3 +110,28 @@ insert into public.docs (col, id, data) values
 ('depts','d_reg','{"name":"Отдел регистрации","order":1}'),
 ('depts','d_tech','{"name":"Техобслуживание","order":2}')
 on conflict (col, id) do nothing;
+-- Безопасность: белый список IP проверяется на сервере. Администратор под ограничение не попадает.
+create or replace function public.client_ip() returns text
+language sql stable as $$
+  select nullif(trim(split_part(coalesce(
+    current_setting('request.headers', true)::json->>'x-forwarded-for',
+    current_setting('request.headers', true)::json->>'cf-connecting-ip', ''), ',', 1)), '')
+$$;
+
+create or replace function public.my_role() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare m jsonb; r jsonb; rid text; sec jsonb; ip text;
+begin
+  m := public.me();
+  if m is null or coalesce((m->>'blocked')::boolean, false) then return null; end if;
+  rid := coalesce(nullif(m->>'access', ''), case when m->>'role' = 'Руководитель' then 'r_admin' else 'r_manager' end);
+  if rid = 'r_admin' then return '{"manage": true}'::jsonb; end if;
+  select data into sec from docs where col = 'config' and id = 'security';
+  if coalesce((sec->>'ipEnabled')::boolean, false) then
+    ip := public.client_ip();
+    if ip is null or not (coalesce(sec->'ips', '[]'::jsonb) ? ip) then return null; end if;
+  end if;
+  select data into r from docs where col = 'roles' and id = rid;
+  if r is null then select data into r from docs where col = 'roles' and id = 'r_manager'; end if;
+  return coalesce(r, '{}'::jsonb);
+end $$;
