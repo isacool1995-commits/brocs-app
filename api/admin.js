@@ -51,10 +51,44 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Нужен POST-запрос.' });
   if (!URL_ || !ANON || !SRV) return res.status(500).json({ error: 'Сервер не настроен: добавьте ключи Supabase в настройках Vercel.' });
 
-  const user = await caller(req);
-  if (!user) return res.status(401).json({ error: 'Сессия истекла. Войдите заново.' });
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const now = new Date().toISOString();
+
+  // ---- Действия без входа: первый запуск и восстановление пароля руководителя ----
+  if (b.action === 'setup-status' || b.action === 'setup' || b.action === 'forgot') {
+    const all = await sb('/rest/v1/docs?col=eq.members&select=id,data');
+    if (!all.ok) return res.status(500).json({ error: 'База не отвечает. Повторите позже.' });
+    const admins = (all.body || []).filter(x => isAdmin(x.data));
+
+    if (b.action === 'setup-status') return res.json({ needsAdmin: admins.length === 0 });
+
+    if (b.action === 'setup') {
+      if (admins.length) return res.status(403).json({ error: 'Руководитель уже создан. Войдите со своей почтой и паролем.' });
+      const email = String(b.email || '').trim().toLowerCase();
+      const password = String(b.password || '');
+      const name = String(b.name || '').trim().slice(0, 80) || 'Руководитель';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Проверьте почту: похоже, в ней ошибка.' });
+      if (password.length < 8) return res.status(400).json({ error: 'Пароль руководителя должен быть не короче 8 символов.' });
+      const r = await sb('/auth/v1/admin/users', { method: 'POST', body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { name } }) });
+      if (!r.ok) return res.status(400).json({ error: authError(r) });
+      const w = await putMember(r.body.id, { name, email, access: 'r_admin', role: 'Руководитель', createdAt: now });
+      return w.ok ? res.json({ ok: true }) : res.status(500).json({ error: 'Аккаунт создан, но сохранить руководителя не удалось. Повторите вход.' });
+    }
+
+    // forgot: письмо уходит только руководителю; сотрудникам пароль задаёт руководитель
+    const email = String(b.email || '').trim().toLowerCase();
+    const target = admins.find(x => String(x.data.email || '').toLowerCase() === email);
+    if (target) {
+      const origin = String(req.headers.origin || ('https://' + req.headers.host));
+      await fetch(URL_ + '/auth/v1/recover?redirect_to=' + encodeURIComponent(origin + '/'), {
+        method: 'POST', headers: { apikey: ANON, 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+      });
+    }
+    return res.json({ ok: true });
+  }
+
+  const user = await caller(req);
+  if (!user) return res.status(401).json({ error: 'Сессия истекла. Войдите заново.' });
 
   // Первый вход владельца: если администратора ещё нет, вошедший становится администратором.
   if (b.action === 'claim') {

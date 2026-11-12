@@ -44,6 +44,13 @@ body{margin:0}
 .login{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
 .login-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
 .login-card .inp{height:42px}
+.lg-pane{display:flex;flex-direction:column;gap:14px}
+.lg-pane h1{font-size:20px;font-weight:800}
+.lg-note{margin:0;color:var(--muted);font-size:13px}
+.lg-btn{height:42px;justify-content:center}
+.lg-link{border:0;background:none;color:var(--accent);font-weight:700;padding:2px 0;align-self:center}
+.lg-msg{margin:0;font-weight:700;min-height:1.2em;color:var(--bad)}
+.lg-msg.ok{color:var(--ok)}
 [hidden]{display:none!important}
 html,body{height:100%}
 body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.45}
@@ -294,15 +301,40 @@ table.perm select{font-weight:700;height:32px}
 </div>
 <datalist id="kzCities"><option>Алматы</option><option>Астана</option><option>Шымкент</option><option>Караганда</option><option>Актобе</option><option>Тараз</option><option>Павлодар</option><option>Усть-Каменогорск</option><option>Семей</option><option>Атырау</option><option>Костанай</option><option>Кызылорда</option><option>Уральск</option><option>Петропавловск</option><option>Актау</option><option>Туркестан</option><option>Талдыкорган</option><option>Кокшетау</option><option>Экибастуз</option><option>Конаев</option></datalist>
 <div id="login" class="login" hidden>
-  <form id="loginForm" class="login-card" autocomplete="on">
+  <div class="login-card">
     <div class="brand" style="color:var(--fg);padding:0"><svg width="40" height="40" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="9" fill="#0E7F74"/><path d="M10 8h13v4h-8.6v3.4H18a6.3 6.3 0 1 1 0 12.6H10Zm4.4 11.2v4.8H18a2.4 2.4 0 0 0 0-4.8Z" fill="#fff"/><circle cx="26" cy="25.5" r="2.6" fill="#F2B544"/></svg><span><b style="font-size:22px">Брокс</b><small style="color:var(--muted);opacity:1">CRM команды</small></span></div>
-    <h1 style="font-size:20px;font-weight:800">Вход</h1>
-    <label class="f">Почта<input class="inp" id="lg-email" type="email" autocomplete="username" required></label>
-    <label class="f">Пароль<input class="inp" id="lg-pass" type="password" autocomplete="current-password" required></label>
-    <p id="lg-err" role="alert" style="margin:0;color:var(--bad);font-weight:700;min-height:1.2em"></p>
-    <button class="btn primary" id="lg-btn" type="submit" style="height:42px;justify-content:center">Войти</button>
-    <p style="margin:0;color:var(--muted);font-size:12.5px">Почту и пароль выдаёт руководитель. Забыли пароль — попросите его задать новый.</p>
-  </form>
+    <form id="loginForm" class="lg-pane" autocomplete="on">
+      <h1>Вход</h1>
+      <label class="f">Почта<input class="inp" id="lg-email" type="email" autocomplete="username" required></label>
+      <label class="f">Пароль<input class="inp" id="lg-pass" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary lg-btn" type="submit">Войти</button>
+      <button class="lg-link" type="button" data-a="lg-mode" data-v="forgot">Забыли пароль?</button>
+    </form>
+    <form id="setupForm" class="lg-pane" hidden autocomplete="on">
+      <h1>Первый запуск</h1>
+      <p class="lg-note">В CRM ещё нет руководителя. Создайте свой аккаунт: с ним вы будете входить, добавлять сотрудников и выдавать им пароли.</p>
+      <label class="f">Ваше имя<input class="inp" id="su-name" autocomplete="name" required maxlength="80"></label>
+      <label class="f">Почта<input class="inp" id="su-email" type="email" autocomplete="username" required></label>
+      <label class="f">Пароль<input class="inp" id="su-pass" type="password" autocomplete="new-password" required minlength="8"></label>
+      <label class="f">Пароль ещё раз<input class="inp" id="su-pass2" type="password" autocomplete="new-password" required minlength="8"></label>
+      <button class="btn primary lg-btn" type="submit">Создать аккаунт руководителя</button>
+    </form>
+    <form id="forgotForm" class="lg-pane" hidden>
+      <h1>Восстановить пароль</h1>
+      <p class="lg-note">Руководителю придёт письмо со ссылкой для нового пароля. Сотрудникам новый пароль задаёт руководитель в разделе «Команда».</p>
+      <label class="f">Почта руководителя<input class="inp" id="fg-email" type="email" autocomplete="username" required></label>
+      <button class="btn primary lg-btn" type="submit">Отправить письмо</button>
+      <button class="lg-link" type="button" data-a="lg-mode" data-v="login">Вернуться ко входу</button>
+    </form>
+    <form id="recoverForm" class="lg-pane" hidden>
+      <h1>Новый пароль</h1>
+      <p class="lg-note">Придумайте новый пароль для входа в CRM.</p>
+      <label class="f">Новый пароль<input class="inp" id="rc-pass" type="password" autocomplete="new-password" required minlength="8"></label>
+      <label class="f">Ещё раз<input class="inp" id="rc-pass2" type="password" autocomplete="new-password" required minlength="8"></label>
+      <button class="btn primary lg-btn" type="submit">Сохранить пароль</button>
+    </form>
+    <p id="lg-err" role="alert" class="lg-msg"></p>
+  </div>
 </div>
 <div id="overlay"></div>
 <div id="confirmLayer"></div>
@@ -462,24 +494,51 @@ async function boot(){
   readHash(); render();
   let cfg=null; try{ cfg=await (await fetch('/api/config',{cache:'no-store'})).json() }catch(e){}
   if(!cfg||!cfg.url||!cfg.anon||!window.supabase){ offline(); return }
-  sb=window.supabase.createClient(cfg.url,cfg.anon,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'broks-auth'}});
-  sb.auth.onAuthStateChange(ev=>{ if(ev==='SIGNED_OUT') location.reload() });
+  const recovering=/type=recovery/.test(location.hash);
+  sb=window.supabase.createClient(cfg.url,cfg.anon,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'broks-auth'}});
+  sb.auth.onAuthStateChange(ev=>{ if(ev==='SIGNED_OUT') location.reload(); if(ev==='PASSWORD_RECOVERY') showLogin('recover') });
   const {data:{session}}=await sb.auth.getSession();
-  if(session) start(session.user); else showLogin() }
+  if(recovering&&session){ try{ history.replaceState(null,'',location.pathname) }catch(e){} showLogin('recover'); return }
+  if(session){ start(session.user); return }
+  let mode='login'; try{ const j=await apiPublic('setup-status'); if(j.needsAdmin) mode='setup' }catch(e){}
+  showLogin(mode) }
 async function start(user){
   hideLogin(); S.me=user.id; S.email=user.email; S.mode='starting'; render();
   const timer=setTimeout(()=>{ if(S.mode==='starting'){ S.mode='slow'; render() } },10000);
   let ok=await loadAll();
   if(ok&&!S.members[S.me]){ try{ await api('claim',{}); ok=await loadAll() }catch(e){} }
   clearTimeout(timer); S.mode=ok?'live':'slow'; render(); if(ok) subscribe() }
-function showLogin(){ $('#login').hidden=false; setTimeout(()=>{ const e=$('#lg-email'); if(e) e.focus() },50) }
+async function apiPublic(action,payload){
+  let r; try{ r=await fetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action},payload||{}))}) }catch(e){ throw new Error('Нет связи с сервером. Проверьте интернет.') }
+  let j={}; try{ j=await r.json() }catch(e){}
+  if(!r.ok) throw new Error(j.error||'Сервер не ответил. Повторите.'); return j }
+const LG_FORMS={login:'loginForm',setup:'setupForm',forgot:'forgotForm',recover:'recoverForm'};
+function showLogin(mode){ mode=mode||'login'; $('#login').hidden=false; lgMsg('');
+  Object.keys(LG_FORMS).forEach(k=>{ $('#'+LG_FORMS[k]).hidden=k!==mode });
+  setTimeout(()=>{ const f=$('#'+LG_FORMS[mode]+' input'); if(f) f.focus() },50) }
 function hideLogin(){ $('#login').hidden=true }
-document.addEventListener('submit',async e=>{ if(e.target.id!=='loginForm') return; e.preventDefault();
-  const btn=$('#lg-btn'), err=$('#lg-err'); err.textContent=''; btn.disabled=true; btn.textContent='Входим…';
-  const {data,error}=await sb.auth.signInWithPassword({email:$('#lg-email').value.trim(),password:$('#lg-pass').value});
-  btn.disabled=false; btn.textContent='Войти';
-  if(error){ err.textContent=/banned/i.test(error.message)?'Доступ закрыт. Обратитесь к руководителю.':/invalid/i.test(error.message)?'Неверная почта или пароль.':'Не получилось войти. Проверьте интернет и повторите.'; return }
-  $('#lg-pass').value=''; start(data.user) });
+function lgMsg(t,ok){ const m=$('#lg-err'); m.textContent=t; m.classList.toggle('ok',!!ok) }
+async function lgBusy(form,label,fn){ const b=form.querySelector('.lg-btn'), old=b.textContent; b.disabled=true; b.textContent=label; lgMsg('');
+  try{ await fn() }finally{ b.disabled=false; b.textContent=old } }
+async function signIn(email,password){
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error){ lgMsg(/banned/i.test(error.message)?'Доступ закрыт. Обратитесь к руководителю.':/invalid/i.test(error.message)?'Неверная почта или пароль.':'Не получилось войти. Проверьте интернет и повторите.'); return false }
+  start(data.user); return true }
+document.addEventListener('submit',async e=>{ const id=e.target.id; if(!['loginForm','setupForm','forgotForm','recoverForm'].includes(id)) return; e.preventDefault(); const f=e.target;
+  if(id==='loginForm') return lgBusy(f,'Входим…',async()=>{ if(await signIn($('#lg-email').value.trim(),$('#lg-pass').value)) $('#lg-pass').value='' });
+  if(id==='setupForm') return lgBusy(f,'Создаём…',async()=>{ const p=$('#su-pass').value;
+    if(p.length<8) return lgMsg('Пароль должен быть не короче 8 символов.');
+    if(p!==$('#su-pass2').value) return lgMsg('Пароли не совпадают.');
+    try{ await apiPublic('setup',{name:$('#su-name').value.trim(),email:$('#su-email').value.trim(),password:p}) }catch(err){ return lgMsg(err.message) }
+    await signIn($('#su-email').value.trim(),p) });
+  if(id==='forgotForm') return lgBusy(f,'Отправляем…',async()=>{
+    try{ await apiPublic('forgot',{email:$('#fg-email').value.trim()}); lgMsg('Если это почта руководителя, письмо уже отправлено. Проверьте входящие и «Спам».',true) }catch(err){ lgMsg(err.message) } });
+  if(id==='recoverForm') return lgBusy(f,'Сохраняем…',async()=>{ const p=$('#rc-pass').value;
+    if(p.length<8) return lgMsg('Пароль должен быть не короче 8 символов.');
+    if(p!==$('#rc-pass2').value) return lgMsg('Пароли не совпадают.');
+    const {data,error}=await sb.auth.updateUser({password:p});
+    if(error) return lgMsg('Ссылка устарела. Запросите письмо ещё раз.');
+    lgMsg('Пароль сохранён.',true); start(data.user) }) });
 async function logout(){ try{ await sb.auth.signOut() }catch(e){} location.reload() }
 function offline(){ S.mode='local'; S.me='local'; S.members={local:{name:'Вы',role:'Руководитель',access:'r_admin',createdAt:now()}}; render() }
 
@@ -930,6 +989,7 @@ const A={
     try{ await api('password',{id,password:p}); inp.value=''; toast('Пароль изменён. Передайте его сотруднику') }catch(e){ toast(e.message) } },
   'gen-pass':el=>{ const i=$('#'+(el.dataset.t||'m-pass')); if(i){ i.value=genPass(); i.focus(); i.select() } },
   logout:()=>logout(),
+  'lg-mode':el=>showLogin(el.dataset.v),
   'deals-mode':el=>{ S.dealsMode=el.dataset.v; render(true) },
   'deals-status':el=>{ S.dealsStatus=el.dataset.v; render(true) },
   'task-filter':el=>{ S.taskFilter=el.dataset.v; render(true) },
