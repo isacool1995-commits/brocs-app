@@ -2,7 +2,7 @@
 // Каждый запрос проверяется по подписи X-Signature (HMAC-SHA256 с секретом из кабинета Profit Bot).
 const crypto = require('crypto');
 const { configured } = require('./_sb');
-const { CHANNELS, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc } = require('./_chat');
+const { CHANNELS, ourNumber, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc } = require('./_chat');
 
 const SECRET = process.env.PROFITBOT_WEBHOOK_SECRET || '';
 
@@ -82,6 +82,7 @@ module.exports = async (req, res) => {
   if (!validSignature(raw, req.headers['x-signature'])) return res.status(401).json({ error: 'Неверная подпись.' });
   let ev;
   try { ev = JSON.parse(raw.toString('utf8')); } catch (e) { return res.status(400).json({ error: 'Неверный JSON.' }); }
+  if (ev.instance && !ourNumber(ev.instance.phone)) return res.status(200).json({ ok: true, skipped: 'чужой номер' });
   try {
     if (ev.event === 'message.status') await onStatus(ev);
     else if (ev.event === 'message.incoming' || ev.event === 'message.outgoing') await onMessage(ev);

@@ -1,6 +1,6 @@
 // Отправка сообщения клиенту из карточки сделки через Profit Bot.
 const { URL_, ANON, caller, body, configured } = require('./_sb');
-const { CHANNELS, normPhone, digits, getDoc, putDoc } = require('./_chat');
+const { CHANNELS, ourNumber, normPhone, digits, getDoc, putDoc } = require('./_chat');
 
 const KEY = process.env.PROFITBOT_API_KEY || '';
 const DEFAULT_FROM = digits(process.env.PROFITBOT_FROM || '');
@@ -31,7 +31,8 @@ module.exports = async (req, res) => {
 
   const to = contact['chat_' + channel] || normPhone(contact.phoneNorm || contact.phone);
   if (!to) return res.status(400).json({ error: 'У контакта нет телефона для ' + CHANNELS[channel] + '.' });
-  const from = digits(contact['instance_' + channel]) || DEFAULT_FROM;
+  const known = digits(contact['instance_' + channel]);
+  const from = (known && ourNumber(known) ? known : '') || DEFAULT_FROM;
   if (!from) return res.status(400).json({ error: 'Неизвестно, с какого номера писать: клиент ещё не писал вам в ' + CHANNELS[channel] + ', а номер по умолчанию (PROFITBOT_FROM) не задан.' });
 
   let pr, pj = {};

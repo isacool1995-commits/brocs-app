@@ -33,4 +33,9 @@ async function firstStage() {
 
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-module.exports = { CHANNELS, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };
+// Номера Profit Bot, с которыми работает «Брокс». Остальные номера аккаунта (например, подключённые к amoCRM) пропускаем.
+const NUMBERS = String(process.env.PROFITBOT_NUMBERS || process.env.PROFITBOT_FROM || '')
+  .split(/[,;\s]+/).map(digits).filter(Boolean);
+const ourNumber = phone => !NUMBERS.length || NUMBERS.includes(digits(phone));
+
+module.exports = { CHANNELS, NUMBERS, ourNumber, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };
