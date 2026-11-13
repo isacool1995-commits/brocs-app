@@ -196,6 +196,11 @@ td.r,th.r{text-align:right}
 .dbody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,390px) minmax(0,1fr);overflow:hidden}
 .dleft{overflow-y:auto;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:14px 18px 24px}
 .dtop{display:flex;justify-content:space-between;gap:8px;margin:0 -8px}
+.cf-block{display:flex;flex-direction:column;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
+.cf-multi .chk-l{font-size:12.5px;padding:4px 8px}
+.fe-row{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}
+.fe-head{display:flex;gap:6px;align-items:center}
+.fe-head .inp{flex:1;min-width:0;font-weight:700}
 .dtitle{font-size:21px;font-weight:800;letter-spacing:-.01em;border:1px solid transparent;border-radius:8px;padding:4px 7px;margin:-4px -7px;background:transparent;width:calc(100% + 14px)}
 .dtitle:hover,.dtitle:focus{border-color:var(--line);background:var(--bg)}
 .dmeta{font-size:12.5px;color:var(--muted);margin-top:-8px}
@@ -617,7 +622,47 @@ document.addEventListener('focusout',()=>{ setTimeout(()=>{ if(pendingRender) re
 
 const match=(...xs)=>{ const q=S.q.trim().toLowerCase(); if(!q) return true; return xs.some(x=>String(x||'').toLowerCase().includes(q)) };
 function dealMatches(d){ const c=S.contacts[d.contact], co=S.companies[d.company];
-  return match(d.title,c&&c.name,c&&c.phone,co&&co.name,co&&co.city,co&&co.bin,co&&co.pay,(d.tags||[]).join(' ')) }
+  const fv=Object.values(d.f||{}).map(v=>Array.isArray(v)?v.join(' '):v).join(' ');
+  return match(d.title,c&&c.name,c&&c.phone,co&&co.name,co&&co.city,co&&co.bin,co&&co.pay,(d.tags||[]).join(' '),fv) }
+
+// ---------- Поля сделки ----------
+const FIELD_TYPES=[['text','Строка'],['textarea','Текст'],['number','Число'],['select','Список (один вариант)'],['multiselect','Список (несколько вариантов)'],['checkbox','Флажок (да/нет)'],['date','Дата'],['url','Ссылка']];
+const HAS_OPTS=t=>t==='select'||t==='multiselect';
+function dealFields(){ const l=((S.config&&S.config.dealfields)||{}).list; return Array.isArray(l)?l:[] }
+function fieldInput(f,v){ const id='cf-'+esc(f.id);
+  if(f.type==='select') return '<select class="inp" id="'+id+'"><option value="">—</option>'+(f.options||[]).map(o=>'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>').join('')+(v&&!(f.options||[]).includes(v)?'<option selected>'+esc(v)+'</option>':'')+'</select>';
+  if(f.type==='multiselect'){ const set=Array.isArray(v)?v:[]; return '<div class="chips cf-multi" id="'+id+'">'+(f.options||[]).map((o,i)=>'<label class="chk-l"><input type="checkbox" id="'+id+'-'+i+'" data-cf="'+esc(f.id)+'" value="'+esc(o)+'"'+(set.includes(o)?' checked':'')+'> '+esc(o)+'</label>').join('')+'</div>' }
+  if(f.type==='textarea') return '<textarea class="inp" id="'+id+'" rows="2">'+esc(v||'')+'</textarea>';
+  if(f.type==='checkbox') return '<label class="chk-l" style="align-self:flex-start"><input type="checkbox" id="'+id+'"'+(v?' checked':'')+'> Да</label>';
+  const type={number:'number',date:'date',url:'url'}[f.type]||'text';
+  return '<input class="inp'+(f.type==='number'?' num':'')+'" id="'+id+'" type="'+type+'" value="'+esc(v==null?'':v)+'">' }
+function fieldsBlock(d){ const fs=dealFields(); if(!fs.length) return isBoss()?'<p class="set-hint" style="margin:0">Дополнительных полей пока нет. Нажмите ⚙ вверху карточки, чтобы добавить.</p>':'';
+  const vals=d.f||{};
+  return '<div class="cf-block">'+fs.map(f=>'<'+(f.type==='multiselect'||f.type==='checkbox'?'div':'label')+' class="f">'+esc(f.name)+(f.required?' <span style="color:var(--bad)">*</span>':'')+fieldInput(f,vals[f.id])+'</'+(f.type==='multiselect'||f.type==='checkbox'?'div':'label')+'>').join('')+'</div>' }
+function readFields(){ const out={}, miss=[];
+  dealFields().forEach(f=>{ let v;
+    if(f.type==='multiselect') v=[...document.querySelectorAll('[data-cf="'+CSS.escape(f.id)+'"]:checked')].map(x=>x.value);
+    else if(f.type==='checkbox'){ const e=$('#cf-'+CSS.escape(f.id)); v=!!(e&&e.checked) }
+    else { const e=$('#cf-'+CSS.escape(f.id)); v=e?e.value.trim():''; if(f.type==='number'&&v!=='') v=Number(v) }
+    const empty=v===''||v==null||(Array.isArray(v)&&!v.length)||v===false;
+    if(f.required&&empty) miss.push(f.name);
+    if(!empty) out[f.id]=v });
+  return {values:out,miss} }
+function drawFieldsEditor(){ const o=S.overlay; if(!o.list) o.list=JSON.parse(JSON.stringify(dealFields()));
+  const L=o.list;
+  modal('Поля сделки',
+    '<p class="set-hint" style="margin:0">Эти поля видны в карточке каждой сделки. Название, бюджет, этап, ответственный, клиент и контакт есть всегда. Изменения применятся ко всей команде после «Сохранить».</p>'+
+    (L.length?L.map((f,i)=>'<div class="fe-row">'+
+      '<div class="fe-head"><span class="num" style="color:var(--muted)">'+(i+1)+'</span><input class="inp" id="fe-name-'+i+'" value="'+esc(f.name)+'" maxlength="60" aria-label="Название поля" data-a="fe-sync"><button type="button" class="btn sm ghost" data-a="fe-up" data-i="'+i+'"'+(i?'':' disabled')+' aria-label="Выше">↑</button><button type="button" class="btn sm ghost" data-a="fe-down" data-i="'+i+'"'+(i<L.length-1?'':' disabled')+' aria-label="Ниже">↓</button><button type="button" class="btn sm ghost danger" data-a="fe-del" data-i="'+i+'">Удалить</button></div>'+
+      '<div class="grid2"><label class="f">Тип<select class="inp" id="fe-type-'+i+'" data-a="fe-type" data-i="'+i+'">'+FIELD_TYPES.map(t=>'<option value="'+t[0]+'"'+(t[0]===f.type?' selected':'')+'>'+t[1]+'</option>').join('')+'</select></label>'+
+      '<label class="chk-l" style="align-self:end;height:36px"><input type="checkbox" id="fe-req-'+i+'"'+(f.required?' checked':'')+'> Обязательное</label></div>'+
+      (HAS_OPTS(f.type)?'<label class="f">Варианты (каждый с новой строки)<textarea class="inp" id="fe-opts-'+i+'" rows="4">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
+      '</div>').join(''):'<p style="margin:0;color:var(--muted)">Полей пока нет.</p>')+
+    '<button type="button" class="btn" data-a="fe-add" style="align-self:flex-start">+ Добавить поле</button>',
+    (o.back?'<button class="btn" data-a="task-back">Назад к сделке</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="fe-save">Сохранить</button>') }
+function feCollect(){ const L=S.overlay.list; L.forEach((f,i)=>{ const n=$('#fe-name-'+i), t=$('#fe-type-'+i), r=$('#fe-req-'+i), op=$('#fe-opts-'+i);
+  if(n) f.name=n.value.trim().slice(0,60); if(t) f.type=t.value; if(r) f.required=r.checked;
+  if(op) f.options=op.value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,200); if(!HAS_OPTS(f.type)) delete f.options }) }
 const emptyBox=(t,s)=>'<div class="empty"><b>'+t+'</b>'+s+'</div>';
 
 function nextTask(dealId){ return vis('tasks').filter(t=>t.deal===dealId&&!t.done).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9'))[0] }
@@ -871,7 +916,7 @@ function vSetup(){
 
 // ---------- окна ----------
 function closeOverlay(){ S.overlay=null; $('#overlay').innerHTML='' }
-function openOverlay(o){ S.overlay=o; ({mailcompose:drawMailCompose,mailboxes:drawMailBoxes,deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
+function openOverlay(o){ S.overlay=o; ({fields:drawFieldsEditor,mailcompose:drawMailCompose,mailboxes:drawMailBoxes,deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
 function applyLock(o){ const root=$('#overlay'); applyPerms(root); const ent={deal:'deals',task:'tasks',contact:'contacts',company:'companies'}[o.kind];
   if(!ent||o.isNew||S.overlay!==o) return; const rec=S[ent][o.id]; if(!rec) return; const ed=can(ent,'edit',rec), dl=can(ent,'del',rec);
   root.querySelectorAll('[data-a="deal-del"],[data-a="task-del"],[data-a="contact-del"],[data-a="company-del"]').forEach(b=>{ b.hidden=!dl });
@@ -913,7 +958,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
    '</div>';
   $('#overlay').innerHTML='<div class="scrim" data-a="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Сделка"><div class="dbody">'+
    '<div class="dleft">'+
-    '<div class="dtop"><button class="btn sm ghost" data-a="close">← Закрыть</button>'+(o.isNew?'':'<button class="btn sm ghost danger" data-a="deal-del">Удалить</button>')+'</div>'+
+    '<div class="dtop"><button class="btn sm ghost" data-a="close">← Закрыть</button><span style="display:flex;gap:4px">'+(isBoss()?'<button class="btn sm ghost" data-a="fields-edit" title="Настроить поля сделки" aria-label="Настроить поля сделки">⚙</button>':'')+(o.isNew?'':'<button class="btn sm ghost danger" data-a="deal-del">Удалить</button>')+'</span></div>'+
     '<input class="dtitle" id="d-title" form="dealForm" required value="'+esc(d.title)+'" placeholder="Название сделки" aria-label="Название сделки">'+
     '<div class="dmeta">'+(o.isNew?'Новая сделка':'Создана '+esc(fmtDate(d.createdAt,true)))+'</div>'+
     '<div id="stageBar"></div>'+
@@ -926,6 +971,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
      '<label class="f">Контактное лицо<select class="inp" id="d-contact" data-a="sel-new" data-t="d-newc">'+cOpts+'</select></label>'+
      '<div id="d-newc" class="grid2" hidden><label class="f">Имя<input class="inp" id="d-nc-name"></label><label class="f">Телефон<input class="inp" id="d-nc-phone" type="tel" placeholder="+7 7__ ___ __ __"></label></div>'+
      '<label class="f">Теги через запятую<input class="inp" id="d-tags" value="'+esc((d.tags||[]).join(', '))+'" placeholder="опт, сайт"></label>'+
+     fieldsBlock(d)+
      '<button class="btn primary" type="submit">'+(o.isNew?'Создать сделку':'Сохранить')+'</button>'+
     '</form>'+
     '<div id="clientBox"></div>'+
@@ -977,12 +1023,13 @@ async function logNote(kind,text,extra){ const id=S.overlay.id; const d=JSON.par
   const ok=await put('deals',id,d); if(ok) renderDealLive(true); return ok }
 
 async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.trim(); if(!title){ toast('Введите название сделки'); $('#d-title').focus(); return }
+  const cf=readFields(); if(cf.miss.length){ toast('Заполните: '+cf.miss.join(', ')); return }
   let contact=$('#d-contact').value, company=$('#d-company').value;
   if(company==='__new'){ const nm=$('#d-nco-name').value.trim(); if(!nm){ toast('Введите название новой компании'); return } company=newId(); await put('companies',company,{name:nm,owner:$('#d-owner').value||S.me,createdAt:now()}) }
   if(contact==='__new'){ const nm=$('#d-nc-name').value.trim(); if(!nm){ toast('Введите имя нового контакта'); return } contact=newId(); await put('contacts',contact,{name:nm,phone:$('#d-nc-phone').value.trim(),company:company||'',owner:$('#d-owner').value,createdAt:now()}) }
   const id=o.isNew?newId():o.id; const prev=o.isNew?null:S.deals[id];
   const d=Object.assign({},prev||{createdAt:now(),notes:[]},{title,pipeline:$('#d-pipe').value,budget:Math.max(0,Math.round(+$('#d-budget').value||0)),owner:$('#d-owner').value,contact,company,
-    tags:$('#d-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,10),updatedAt:now()});
+    tags:$('#d-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,10),f:cf.values,updatedAt:now()});
   applyStage(d,$('#d-stage').value,prev);
   if(await put('deals',id,d)){ toast(o.isNew?'Сделка создана':'Сохранено'); if(o.isNew){ openOverlay({kind:'deal',id}) } else updateWa() } }
 function applyStage(d,stage,prev){ const old=prev?prev.stage:null; d.stage=stage;
@@ -1161,6 +1208,16 @@ const A={
     catch(e){ toast(e.message); btn.disabled=false; btn.textContent='Проверить и подключить' } },
   'mail-box-del':el=>{ const id=el.dataset.id; confirmBox('Отключить этот ящик? Уже загруженные письма останутся в CRM.','Отключить',async()=>{
     try{ const j=await apiMail('del-box',{id}); S.boxes=j.boxes; if(S.overlay&&S.overlay.kind==='mailboxes') drawMailBoxes(); render(); toast('Ящик отключён') }catch(e){ toast(e.message) } },'') },
+  'fields-edit':()=>{ if(!isBoss()) return; const o=S.overlay; const back=o&&o.kind==='deal'&&!o.isNew?{kind:'deal',id:o.id}:null;
+    if(o&&o.isNew){ toast('Сначала сохраните сделку, затем настройте поля'); return } openOverlay({kind:'fields',back}) },
+  'fe-add':()=>{ feCollect(); S.overlay.list.push({id:'f_'+newId(),name:'Новое поле',type:'text'}); drawFieldsEditor(); const n=$('#fe-name-'+(S.overlay.list.length-1)); if(n){ n.focus(); n.select() } },
+  'fe-del':el=>{ feCollect(); S.overlay.list.splice(+el.dataset.i,1); drawFieldsEditor() },
+  'fe-up':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i>0){ [L[i-1],L[i]]=[L[i],L[i-1]] } drawFieldsEditor() },
+  'fe-down':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i<L.length-1){ [L[i+1],L[i]]=[L[i],L[i+1]] } drawFieldsEditor() },
+  'fe-save':async()=>{ feCollect(); const L=S.overlay.list;
+    const bad=L.find(f=>!f.name); if(bad){ toast('У каждого поля должно быть название'); return }
+    const noOpts=L.find(f=>HAS_OPTS(f.type)&&!(f.options||[]).length); if(noOpts){ toast('Добавьте варианты для поля «'+noOpts.name+'»'); return }
+    if(await saveConfig('dealfields',{list:L})){ toast('Поля сохранены'); backOrClose() } },
   'deal-mail':async()=>{ const o=S.overlay, d=S.deals[o.id]; if(!d) return; await loadBoxes();
     if(!(S.boxes||[]).length){ toast(isBoss()?'Сначала подключите ящик: «Почта» → «Почтовые ящики»':'Почта не подключена. Обратитесь к руководителю.'); return }
     const c=S.contacts[d.contact]; openOverlay({kind:'mailcompose',to:(c&&c.email)||'',subject:d.title||'',deal:o.id,back:{kind:'deal',id:o.id}}) },
@@ -1204,6 +1261,7 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
+  else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
   else if(a==='mb-email'){ const p=mailPreset(el.value); if(p){ $('#mb-imap').value=p[2]; $('#mb-imap-port').value=p[3]; $('#mb-smtp').value=p[4]; $('#mb-smtp-port').value=p[5]; $('#mb-hint').textContent='Это '+p[1]+'. Пароль для приложений создаётся здесь: '+p[6]+'.' } }
   else if(a==='gen-set'){ const k=el.dataset.k; let v=el.value; if(k==='hour12') v=v==='true'; if(k==='account') v=v.trim().slice(0,60);
     saveConfig('general',{[k]:v}).then(ok=>{ if(ok){ toast('Сохранено'); el.blur(); render(true) } }) }
