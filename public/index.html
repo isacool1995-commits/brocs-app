@@ -267,6 +267,9 @@ td.r,th.r{text-align:right}
 .mail-meta .fk{display:inline-block;min-width:76px}
 .mail-att{padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px}
 .mail-text{padding:16px;line-height:1.55;max-height:calc(100vh - 330px);overflow-y:auto}
+.chatmsg.ch-telegram.out{background:color-mix(in srgb,var(--out) 60%,#9fd2f5 40%)}
+.chatmsg.ch-max.out{background:color-mix(in srgb,var(--out) 60%,#c6b8f7 40%)}
+.chatmsg a{font-weight:700}
 .mailmsg{cursor:pointer;border:1px dashed var(--line)}
 @media (max-width:900px){.mailbox{grid-template-columns:minmax(0,1fr)}.mail-list .body,.mail-text{max-height:none}}
 .settings{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
@@ -396,7 +399,7 @@ const DEFAULT_STAGES=[
 const PALETTE=['#5B7CE6','#2BA3C4','#1C9E7E','#7DB547','#D59A1F','#E0703A','#D2504B','#B865D6','#7A869A'];
 const WON='won', LOST='lost';
 const TASK_TYPES=['Звонок','Встреча','Письмо','Дело'];
-const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config','mail'];
+const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config','mail','chat'];
 const FORMS=['ИП','ТОО','Другое'];
 const TAX=['Общеустановленный режим','Не общеустановленный (спецрежим)'];
 const PAYERS=['Юридическое лицо','Физическое лицо'];
@@ -404,7 +407,7 @@ const PAYS=['Kaspi Gold','Рассрочка','Счёт на юрлицо'];
 const opts=(arr,v)=>'<option value="">Не указано</option>'+arr.map(x=>'<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>').join('');
 
 let savedPipe='main'; try{ savedPipe=localStorage.getItem('broks.pipe')||'main' }catch(e){}
-const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},config:{},mail:{},boxes:null,mailSel:null,roleSel:'r_manager',setTab:'general',myIp:null,stages:null,me:null,owner:false,pipe:savedPipe,
+const S={deals:{},contacts:{},companies:{},tasks:{},members:{},pipelines:{},depts:{},roles:{},config:{},mail:{},chat:{},boxes:null,mailSel:null,roleSel:'r_manager',setTab:'general',myIp:null,stages:null,me:null,owner:false,pipe:savedPipe,
   mode:'starting',view:'home',q:'',dealsMode:'board',dealsOwner:'all',dealsStatus:'open',taskFilter:'mine',
   contactTab:'companies',period:'month',overlay:null};
 let db=null, users=null;
@@ -722,7 +725,7 @@ function vDeals(){
 function pipeTabs(pid,counts){ return '<div class="pipes" role="tablist" aria-label="Воронки">'+pipelines().filter(p=>pipeOk(p.id)).map(p=>'<button role="tab" class="btn sm'+(p.id===pid?' primary':'')+'" aria-selected="'+(p.id===pid)+'" data-a="pipe-pick" data-v="'+esc(p.id)+'">'+esc(p.name)+(counts?' <span class="num" style="opacity:.7">'+vis('deals').filter(d=>dealPipe(d)===p.id&&isOpen(d)).length+'</span>':'')+'</button>').join('')+(isBoss()?'<button class="btn sm ghost" data-a="pipe-add">+ Воронка</button>':'')+'</div>' }
 function card(d){ const c=S.contacts[d.contact], co=S.companies[d.company], nt=nextTask(d.id);
   let due=''; if(nt){ const b=bucket(nt); due='<span class="pill '+(b==='overdue'?'bad':b==='today'?'warn':'')+'">'+esc(nt.due?fmtDate(nt.due):'Задача')+'</span>' } else due='<span class="pill warn">Нет задач</span>';
-  return '<article class="card" draggable="'+can('deals','edit',d)+'" data-id="'+esc(d.id)+'" data-a="open-deal" tabindex="0"><div class="t">'+esc(d.title)+'</div><div class="b num">'+rub(d.budget)+'</div>'+((c||co)?'<div class="m">'+esc([co&&co.name,co&&co.city,c&&c.name].filter(Boolean).join(' · '))+'</div>':'')+'<div class="f">'+due+(co&&co.pay?'<span class="tag">'+esc(co.pay)+'</span>':'')+(d.tags||[]).slice(0,3).map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+avatar(d.owner,'sm')+'</div></article>' }
+  return '<article class="card" draggable="'+can('deals','edit',d)+'" data-id="'+esc(d.id)+'" data-a="open-deal" tabindex="0"><div class="t">'+esc(d.title)+'</div><div class="b num">'+rub(d.budget)+'</div>'+((c||co)?'<div class="m">'+esc([co&&co.name,co&&co.city,c&&c.name].filter(Boolean).join(' · '))+'</div>':'')+'<div class="f">'+(d.unread>0?'<span class="pill ok">💬 '+d.unread+'</span>':'')+due+(co&&co.pay?'<span class="tag">'+esc(co.pay)+'</span>':'')+(d.tags||[]).slice(0,3).map(t=>'<span class="tag">'+esc(t)+'</span>').join('')+avatar(d.owner,'sm')+'</div></article>' }
 
 function vTasks(){
   let ts=vis('tasks').filter(t=>match(t.text,t.type,S.deals[t.deal]&&S.deals[t.deal].title));
@@ -952,7 +955,8 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
     '<div class="ctabs" role="tablist"><button role="tab" data-a="ctab" data-v="wa" aria-selected="true">WhatsApp</button><button role="tab" data-a="ctab" data-v="note" aria-selected="false">Примечание</button><button role="tab" data-a="ctab" data-v="task" aria-selected="false">Задача</button>'+(allowedViews().includes('mail')?'<button type="button" data-a="deal-mail" title="Написать письмо клиенту">✉ Письмо</button>':'')+'</div>'+
     '<div id="cp-wa" class="cpane"><div class="tpls">'+TEMPLATES.map((t,i)=>'<button type="button" data-a="tpl" data-i="'+i+'">'+esc(t[0])+'</button>').join('')+'</div>'+
      '<textarea class="inp" id="waText" rows="2" placeholder="Сообщение клиенту…"></textarea>'+
-     '<div class="crow"><span class="waTo" id="waTo"></span><button type="button" class="btn sm" data-a="wa-in">Записать ответ клиента</button><a class="btn sm wa" id="waSend" data-a="wa-send" href="#" target="_blank" rel="noopener">Отправить в WhatsApp</a></div></div>'+
+     '<div class="crow"><span class="waTo" id="waTo"></span><select class="inp" id="chatChannel" style="width:auto;height:30px" aria-label="Мессенджер">'+[['whatsapp','WhatsApp'],['telegram','Telegram'],['max','MAX']].map(([k,l])=>'<option value="'+k+'"'+(k===lastChannel(o.id)?' selected':'')+'>'+l+'</option>').join('')+'</select>'+
+     '<a class="btn sm ghost" id="waSend" data-a="wa-send" href="#" target="_blank" rel="noopener" title="Открыть чат в приложении WhatsApp">Открыть WhatsApp</a><button type="button" class="btn sm wa" data-a="chat-send">Отправить</button></div></div>'+
     '<div id="cp-note" class="cpane" hidden><textarea class="inp" id="noteText" rows="2" placeholder="Что обсудили с клиентом? Примечание видит вся команда."></textarea><div class="crow"><span class="waTo"></span><button type="button" class="btn sm primary" data-a="note-add">Добавить примечание</button></div></div>'+
     '<div id="cp-task" class="cpane" hidden><input class="inp" id="qt-text" placeholder="Что сделать: позвонить, отправить КП…"><div class="crow"><select class="inp" id="qt-type" style="width:auto">'+TASK_TYPES.map(x=>'<option>'+x+'</option>').join('')+'</select><input class="inp" id="qt-due" type="datetime-local" style="width:auto" value="'+toLocalInput((()=>{const x=new Date();x.setDate(x.getDate()+1);x.setHours(10,0,0,0);return x.toISOString()})())+'"><select class="inp" id="qt-owner" style="width:auto">'+memberOptions(d.owner||S.me,true)+'</select><button type="button" class="btn sm primary" data-a="qt-add">Поставить задачу</button></div></div>'+
    '</div>';
@@ -988,7 +992,13 @@ function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return; const s
    '<button type="button" data-a="stage-pick" data-v="'+WON+'" title="Успешно реализовано" aria-label="Этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
    '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i>'+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+'</div>' }
 
+function normPhone(p){ let s=String(p||'').replace(/\D/g,''); if(s.length===11&&s[0]==='8') s='7'+s.slice(1); if(s.length===10) s='7'+s; return s.length>=10?s:'' }
+function lastChannel(dealId){ const cs=list('chat').filter(c=>c.deal===dealId).sort((a,b)=>(b.at||'').localeCompare(a.at||'')); return (cs[0]&&cs[0].channel)||'whatsapp' }
+async function apiChat(payload){ const {data:{session}}=await sb.auth.getSession();
+  let r; try{ r=await fetch('/api/wa-send',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(session?session.access_token:'')},body:JSON.stringify(payload)}) }catch(e){ throw new Error('Нет связи с сервером. Проверьте интернет.') }
+  let j={}; try{ j=await r.json() }catch(e){} if(!r.ok) throw new Error(j.error||'Сообщение не отправлено. Повторите.'); return j }
 function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return; const d=S.deals[o.id]; if(!d) return;
+  if(d.unread>0&&can('deals','edit',d)&&!o.unreadCleared){ o.unreadCleared=true; put('deals',o.id,Object.assign({},d,{unread:0})) }
   if(o.pipe===dealPipe(d)){ renderStageBar(d.stage); const sel=$('#d-stage'); if(sel&&document.activeElement!==sel) sel.value=d.stage }
   const co=S.companies[d.company], ph=dealPhone(d);
   const fld=(k,v)=>'<div style="min-width:0"><div class="fk">'+k+'</div><div style="font-weight:700;overflow-wrap:anywhere">'+(v?esc(v):'<span style="color:var(--warn)">не заполнено</span>')+'</div></div>';
@@ -998,6 +1008,7 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
   vis('tasks').filter(t=>t.deal===o.id).forEach(t=>items.push({at:t.createdAt||t.due||'',kind:'task',t}));
   const cEmail=String((S.contacts[d.contact]||{}).email||'').toLowerCase();
   vis('mail').filter(m=>m.deal===o.id||(cEmail&&String(mailPeer(m).email||'').toLowerCase()===cEmail)).forEach(m=>items.push({at:m.date||'',kind:'mail',m}));
+  list('chat').filter(c=>c.deal===o.id).forEach(c=>items.push({at:c.at||'',kind:'chat',c}));
   items.sort((a,b)=>a.at.localeCompare(b.at));
   const wrap=$('#feedWrap'), feed=$('#feed'); if(!feed) return;
   const atBottom=wrap.scrollHeight-wrap.scrollTop-wrap.clientHeight<60;
@@ -1008,6 +1019,11 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
     if(it.kind==='sys') h+='<div class="ev">'+esc(n.text)+' · '+esc(tm(n.at))+'</div>';
     else if(it.kind==='wa_out') h+='<div class="msg out"><div class="x">'+esc(n.text)+'</div><div class="mt">'+esc(memberName(n.by))+' · '+esc(tm(n.at))+' · WhatsApp</div></div>';
     else if(it.kind==='wa_in') h+='<div class="msg in"><div class="mh">'+esc(n.from||clientName(d))+'</div><div class="x">'+esc(n.text)+'</div><div class="mt">'+esc(tm(n.at))+' · записал '+esc(memberName(n.by))+'</div></div>';
+    else if(it.kind==='chat'){ const c=it.c, chl={whatsapp:'WhatsApp',telegram:'Telegram',max:'MAX'}[c.channel]||c.channel;
+      const st={queued:'⏳ в очереди',sent:'✓ отправлено',delivered:'✓✓ доставлено',read:'✓✓ прочитано',failed:'⚠ не доставлено'}[c.status]||'';
+      const media=c.media_url?'<div><a href="'+esc(c.media_url)+'" target="_blank" rel="noopener">📎 '+esc(c.file_name||({image:'Фото',video:'Видео',voice:'Голосовое',document:'Файл'}[c.type]||'Файл'))+'</a></div>':'';
+      const who=c.dir==='in'?'':(c.source==='crm'?memberName(c.by):c.source==='phone'?'с телефона':c.source==='amo'?'из amoCRM':'менеджер');
+      h+='<div class="msg '+(c.dir==='in'?'in':'out')+' chatmsg ch-'+esc(c.channel)+'">'+(c.dir==='in'?'<div class="mh">'+esc(c.name||clientName(d))+'</div>':'')+(c.text?'<div class="x">'+esc(c.text)+'</div>':'')+media+'<div class="mt">'+esc([who,tm(c.at),chl,c.dir==='out'?st:''].filter(Boolean).join(' · '))+(c.status==='failed'&&c.error?' — '+esc(c.error):'')+'</div></div>' }
     else if(it.kind==='mail'){ const m=it.m; h+='<div class="msg '+(m.folder==='out'?'out':'in')+' mailmsg" data-a="mail-goto" data-id="'+esc(m.id)+'"><div class="mh">✉ '+esc(m.subject||'(без темы)')+'</div><div class="x">'+esc(String(m.text||'').slice(0,400))+(String(m.text||'').length>400?'…':'')+'</div><div class="mt">'+esc(fmtTime(m.date))+' · почта · '+esc(m.folder==='out'?'отправлено':'от '+(m.from.name||m.from.email))+'</div></div>' }
     else if(it.kind==='task'){ const t=it.t, b=bucket(t); h+='<div class="fi task'+(t.done?' done':'')+'" data-a="open-task" data-id="'+esc(t.id)+'"><button class="chk" role="checkbox" aria-checked="'+(!!t.done)+'" aria-label="Выполнено" data-a="toggle-task" data-id="'+esc(t.id)+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-10"/></svg></button><div class="grow"><div class="fh">Задача · '+esc(t.type||'Дело')+' · '+esc(memberName(t.owner))+'</div><div class="t">'+esc(t.text)+'</div></div><span class="due num'+(b==='overdue'?' bad':'')+'">'+esc(t.due?fmtDate(t.due,true):'Без срока')+'</span></div>' }
     else h+='<div class="fi note">'+avatar(n.by,'sm')+'<div class="grow"><div class="fh">'+esc(memberName(n.by))+' · '+esc(tm(n.at))+' · примечание</div><div class="x">'+esc(n.text)+'</div></div></div>' });
@@ -1026,7 +1042,7 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
   const cf=readFields(); if(cf.miss.length){ toast('Заполните: '+cf.miss.join(', ')); return }
   let contact=$('#d-contact').value, company=$('#d-company').value;
   if(company==='__new'){ const nm=$('#d-nco-name').value.trim(); if(!nm){ toast('Введите название новой компании'); return } company=newId(); await put('companies',company,{name:nm,owner:$('#d-owner').value||S.me,createdAt:now()}) }
-  if(contact==='__new'){ const nm=$('#d-nc-name').value.trim(); if(!nm){ toast('Введите имя нового контакта'); return } contact=newId(); await put('contacts',contact,{name:nm,phone:$('#d-nc-phone').value.trim(),company:company||'',owner:$('#d-owner').value,createdAt:now()}) }
+  if(contact==='__new'){ const nm=$('#d-nc-name').value.trim(); if(!nm){ toast('Введите имя нового контакта'); return } contact=newId(); await put('contacts',contact,{name:nm,phone:$('#d-nc-phone').value.trim(),phoneNorm:normPhone($('#d-nc-phone').value),company:company||'',owner:$('#d-owner').value,createdAt:now()}) }
   const id=o.isNew?newId():o.id; const prev=o.isNew?null:S.deals[id];
   const d=Object.assign({},prev||{createdAt:now(),notes:[]},{title,pipeline:$('#d-pipe').value,budget:Math.max(0,Math.round(+$('#d-budget').value||0)),owner:$('#d-owner').value,contact,company,
     tags:$('#d-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,10),f:cf.values,updatedAt:now()});
@@ -1066,7 +1082,7 @@ function drawContact(){ const o=S.overlay; const c=o.isNew?{name:'',phone:'',ema
    (ds.length?'<div class="f">Сделки<div class="panel">'+ds.map(dealRow).join('')+'</div></div>':''),
    (o.isNew?'':'<button class="btn danger" data-a="contact-del">Удалить</button><button class="btn" data-a="new-deal" data-contact="'+esc(o.id)+'">+ Сделка</button>')+'<button class="btn" data-a="close">Отмена</button><button class="btn primary" data-a="contact-save">'+(o.isNew?'Создать':'Сохранить')+'</button>') }
 async function saveContact(){ const o=S.overlay; const name=$('#c-name').value.trim(); if(!name){ toast('Введите имя'); return }
-  const id=o.isNew?newId():o.id; const c=Object.assign({},o.isNew?{createdAt:now()}:S.contacts[id],{name,phone:$('#c-phone').value.trim(),email:$('#c-email').value.trim(),position:$('#c-pos').value.trim(),company:$('#c-company').value,owner:$('#c-owner').value});
+  const id=o.isNew?newId():o.id; const c=Object.assign({},o.isNew?{createdAt:now()}:S.contacts[id],{name,phone:$('#c-phone').value.trim(),phoneNorm:normPhone($('#c-phone').value),email:$('#c-email').value.trim(),position:$('#c-pos').value.trim(),company:$('#c-company').value,owner:$('#c-owner').value});
   if(await put('contacts',id,c)){ toast(o.isNew?'Контакт создан':'Сохранено'); closeOverlay() } }
 
 function drawCompany(){ const o=S.overlay; const c=o.isNew?{name:'',phone:'',site:'',address:''}:S.companies[o.id]; if(!c){ closeOverlay(); return }
@@ -1132,6 +1148,12 @@ const A={
     if(!dealPhone(d)){ e.preventDefault(); toast('Добавьте телефон контактному лицу или клиенту'); return }
     if(!v){ e.preventDefault(); toast('Напишите сообщение или выберите шаблон'); t.focus(); return }
     updateWa(); t.value=''; if(!await logNote('wa_out',v)) t.value=v; updateWa() },
+  'chat-send':async el=>{ const t=$('#waText'), v=t.value.trim(); if(!v){ toast('Напишите сообщение или выберите шаблон'); t.focus(); return }
+    if(!sb){ toast('Отправка работает только на сайте'); return }
+    el.disabled=true; el.textContent='Отправляем…';
+    try{ const j=await apiChat({deal:S.overlay.id,channel:($('#chatChannel')||{}).value||'whatsapp',text:v}); S.chat[j.id]=j.data; t.value=''; updateWa(); renderDealLive(true) }
+    catch(e){ toast(e.message) }
+    el.disabled=false; el.textContent='Отправить' },
   'wa-in':async()=>{ const t=$('#waText'), v=t.value.trim(); if(!v){ toast('Вставьте в поле текст ответа клиента'); t.focus(); return }
     t.value=''; if(!await logNote('wa_in',v,{from:clientName(S.deals[S.overlay.id])})) t.value=v; updateWa() },
   'qt-add':async()=>{ const text=$('#qt-text').value.trim(); if(!text){ toast('Опишите задачу'); $('#qt-text').focus(); return } const v=$('#qt-due').value;

@@ -187,3 +187,42 @@ create policy docs_delete on public.docs for delete to authenticated using (
        when col = 'mail' then public.is_admin()
        else public.can_do(col, 'del', data) end);
 
+-- Переписка из мессенджеров: видна тем, кто видит сделку. Пишет только сервер.
+create or replace function public.can_see_chat(d jsonb) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_admin() or exists (
+    select 1 from docs x where x.col = 'deals' and x.id = d->>'deal' and public.can_do('deals', 'view', x.data))
+$$;
+
+drop policy if exists docs_select on public.docs;
+drop policy if exists docs_insert on public.docs;
+drop policy if exists docs_update on public.docs;
+drop policy if exists docs_delete on public.docs;
+
+create policy docs_select on public.docs for select to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_active()
+       when col = 'mail' then public.can_mail()
+       when col = 'chat' then public.can_see_chat(data)
+       else public.can_do(col, 'view', data) end);
+
+create policy docs_insert on public.docs for insert to authenticated with check (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       when col = 'chat' then public.is_admin()
+       else public.can_do(col, 'create', data) end);
+
+create policy docs_update on public.docs for update to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       when col = 'chat' then public.is_admin()
+       else public.can_do(col, 'edit', data) end)
+  with check (
+  case when col in ('members','pipelines','depts','roles','config') then public.is_admin()
+       when col = 'mail' then public.can_mail()
+       when col = 'chat' then public.is_admin()
+       else public.is_active() end);
+
+create policy docs_delete on public.docs for delete to authenticated using (
+  case when col in ('members','pipelines','depts','roles','config','mail','chat') then public.is_admin()
+       else public.can_do(col, 'del', data) end);
+
