@@ -200,6 +200,10 @@ td.r,th.r{text-align:right}
 .cf-multi .chk-l{font-size:12.5px;padding:4px 8px}
 .fe-row{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}
 .fe-head{display:flex;gap:6px;align-items:center}
+.sr-stage summary{cursor:pointer;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.sr-stage .sr-sum{color:var(--muted);font-size:12.5px}
+.sr-stage[open] summary{margin-bottom:8px}
+.sr-stage .chk-l{font-size:12.5px;padding:4px 8px}
 .fe-head .inp{flex:1;min-width:0;font-weight:700}
 .dtitle{font-size:21px;font-weight:800;letter-spacing:-.01em;border:1px solid transparent;border-radius:8px;padding:4px 7px;margin:-4px -7px;background:transparent;width:calc(100% + 14px)}
 .dtitle:hover,.dtitle:focus{border-color:var(--line);background:var(--bg)}
@@ -661,8 +665,45 @@ function drawFieldsEditor(){ const o=S.overlay; if(!o.list) o.list=JSON.parse(JS
       '<label class="chk-l" style="align-self:end;height:36px"><input type="checkbox" id="fe-req-'+i+'"'+(f.required?' checked':'')+'> Обязательное</label></div>'+
       (HAS_OPTS(f.type)?'<label class="f">Варианты (каждый с новой строки)<textarea class="inp" id="fe-opts-'+i+'" rows="4">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
       '</div>').join(''):'<p style="margin:0;color:var(--muted)">Полей пока нет.</p>')+
-    '<button type="button" class="btn" data-a="fe-add" style="align-self:flex-start">+ Добавить поле</button>',
+    '<div class="crow"><button type="button" class="btn" data-a="fe-add">+ Добавить поле</button><button type="button" class="btn ghost" data-a="stagereq-open">Обязательные по этапам →</button></div>',
     (o.back?'<button class="btn" data-a="task-back">Назад к сделке</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="fe-save">Сохранить</button>') }
+// ---------- Обязательные поля по этапам ----------
+const BUILTIN_REQ=[['budget','Бюджет'],['owner','Ответственный'],['contact','Контактное лицо'],['company','Клиент (бренд)']];
+function stageRules(){ return ((S.config&&S.config.stagerules)||{}).rules||{} }
+function reqKeys(pid,stage){ return ((stageRules()[pid]||{})[stage])||[] }
+function reqLabel(k){ const b=BUILTIN_REQ.find(x=>x[0]===k); if(b) return b[1]; const f=dealFields().find(x=>x.id===k); return f?f.name:'' }
+const emptyVal=v=>v===''||v==null||v===false||(Array.isArray(v)&&!v.length);
+function missingFor(d,pid,stage){ return reqKeys(pid,stage).filter(k=>{
+  if(k==='budget') return !(+d.budget>0);
+  if(k==='owner'||k==='contact'||k==='company') return !d[k];
+  if(!dealFields().some(x=>x.id===k)) return false;
+  return emptyVal((d.f||{})[k]) }) }
+function readField(f){ if(f.type==='multiselect') return [...document.querySelectorAll('[data-cf="'+CSS.escape(f.id)+'"]:checked')].map(x=>x.value);
+  const e=$('#cf-'+CSS.escape(f.id)); if(!e) return undefined; if(f.type==='checkbox') return e.checked;
+  const v=e.value.trim(); return f.type==='number'&&v!==''?Number(v):v }
+function drawReqFill(){ const o=S.overlay, d=S.deals[o.id]; if(!d){ closeOverlay(); return }
+  const opts=(arr,cur)=>'<option value="">—</option>'+arr.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name)+'</option>').join('');
+  modal('Заполните обязательные поля',
+    '<p class="notice warn" style="margin:0">Чтобы перевести «'+esc(d.title)+'» на этап «'+esc(stageOf(o.stage).name)+'», заполните: '+esc(o.miss.map(reqLabel).join(', '))+'.</p>'+
+    o.miss.map(k=>{
+      if(k==='budget') return '<label class="f">Бюджет, '+curSym()+'<input class="inp num" id="rq-budget" type="number" min="1" step="1" value="'+esc(d.budget||'')+'"></label>';
+      if(k==='owner') return '<label class="f">Ответственный<select class="inp" id="rq-owner">'+memberOptions(d.owner,true)+'</select></label>';
+      if(k==='contact') return '<label class="f">Контактное лицо<select class="inp" id="rq-contact">'+opts(vis('contacts').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')),d.contact)+'</select></label>';
+      if(k==='company') return '<label class="f">Клиент (бренд)<select class="inp" id="rq-company">'+opts(vis('companies').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')),d.company)+'</select></label>';
+      const f=dealFields().find(x=>x.id===k); if(!f) return ''; const tag=f.type==='multiselect'||f.type==='checkbox'?'div':'label';
+      return '<'+tag+' class="f">'+esc(f.name)+fieldInput(f,(d.f||{})[k])+'</'+tag+'>' }).join(''),
+    (o.back?'<button class="btn" data-a="task-back">Назад к сделке</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="rq-save">Сохранить и перевести</button>') }
+function drawStageReq(){ const o=S.overlay; if(!o.rules) o.rules=JSON.parse(JSON.stringify(stageRules())); if(!o.pid) o.pid=pipeOf(S.pipe).id;
+  const keys=BUILTIN_REQ.concat(dealFields().map(f=>[f.id,f.name]));
+  const stList=stagesOf(o.pid).concat([{id:WON,name:'Успешно реализовано'},{id:LOST,name:'Закрыто: отказ'}]);
+  const R=o.rules[o.pid]||{};
+  modal('Обязательные поля по этапам',
+    '<p class="set-hint" style="margin:0">Отметьте, какие поля должны быть заполнены, чтобы перевести сделку на этап. Если поле пустое, CRM остановит перенос, покажет уведомление и попросит заполнить поле. Бюджет считается заполненным, если он больше нуля.</p>'+
+    '<label class="f">Воронка<select class="inp" id="sr-pipe" data-a="sr-pipe">'+pipelines().map(p=>'<option value="'+esc(p.id)+'"'+(p.id===o.pid?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
+    stList.map(s=>{ const on=R[s.id]||[];
+      return '<details class="fe-row sr-stage"'+(o.openStage===s.id?' open':'')+'><summary><b>'+esc(s.name)+'</b> <span class="sr-sum" id="sr-sum-'+esc(s.id)+'">'+(on.length?esc(on.map(reqLabel).filter(Boolean).join(', ')):'нет обязательных')+'</span></summary><div class="chips">'+
+        keys.map(([k,l],i)=>'<label class="chk-l"><input type="checkbox" id="sr-'+esc(s.id)+'-'+i+'" data-a="sr-toggle" data-s="'+esc(s.id)+'" value="'+esc(k)+'"'+(on.includes(k)?' checked':'')+'> '+esc(l)+'</label>').join('')+'</div></details>' }).join(''),
+    (o.back?'<button class="btn" data-a="task-back">Назад</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="sr-save">Сохранить</button>') }
 function feCollect(){ const L=S.overlay.list; L.forEach((f,i)=>{ const n=$('#fe-name-'+i), t=$('#fe-type-'+i), r=$('#fe-req-'+i), op=$('#fe-opts-'+i);
   if(n) f.name=n.value.trim().slice(0,60); if(t) f.type=t.value; if(r) f.required=r.checked;
   if(op) f.options=op.value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,200); if(!HAS_OPTS(f.type)) delete f.options }) }
@@ -912,14 +953,14 @@ function vSetup(){
   const p=pipeOf(S.pipe), st=stagesOf(p.id); const cnt=id=>vis('deals').filter(d=>d.stage===id).length; const total=vis('deals').filter(d=>dealPipe(d)===p.id).length;
   let h='<div class="vh"><h1>Воронки</h1></div>'+pipeTabs(p.id,false);
   h+='<section class="panel"><header><h2>Воронка «'+esc(p.name)+'»</h2>'+(p.id!==MAIN?'<button class="btn sm ghost danger" data-a="pipe-del">Удалить воронку</button>':'')+'</header><div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px"><label class="f">Название воронки<input class="inp" id="pipe-name" data-a="pipe-name" value="'+esc(p.name)+'" maxlength="60"></label><span style="color:var(--muted);font-size:12.5px">Сделок в воронке: <b class="num">'+total+'</b>. Название сохраняется, когда вы уходите из поля.</span></div></section>';
-  h+='<div class="vh"><h2 style="font-size:16px;font-weight:800;margin-right:auto">Этапы</h2><button class="btn primary" data-a="stage-add">+ Этап</button></div>';
+  h+='<div class="vh"><h2 style="font-size:16px;font-weight:800;margin-right:auto">Этапы</h2><button class="btn" data-a="stagereq-open">Обязательные поля по этапам</button><button class="btn primary" data-a="stage-add">+ Этап</button></div>';
   h+='<p class="notice" style="margin:0">Этапы «Успешно» и «Отказ» есть в каждой воронке, они внизу доски.</p>';
   h+='<section class="panel">'+st.map((s,i)=>'<div class="stage-row"><span class="num" style="color:var(--muted);width:20px">'+(i+1)+'</span><input class="inp" id="stage-'+esc(s.id)+'" value="'+esc(s.name)+'" data-a="stage-name" data-id="'+esc(s.id)+'" aria-label="Название этапа"><div class="swatches">'+PALETTE.map(c=>'<button class="sw" style="background:'+c+'" aria-label="Цвет" aria-pressed="'+(s.color===c)+'" data-a="stage-color" data-id="'+esc(s.id)+'" data-v="'+c+'"></button>').join('')+'</div><span class="pill num">'+cnt(s.id)+'</span><button class="btn sm ghost" data-a="stage-up" data-id="'+esc(s.id)+'" aria-label="Выше"'+(i?'':' disabled')+'>↑</button><button class="btn sm ghost" data-a="stage-down" data-id="'+esc(s.id)+'" aria-label="Ниже"'+(i<st.length-1?'':' disabled')+'>↓</button><button class="btn sm ghost danger" data-a="stage-del" data-id="'+esc(s.id)+'">Удалить</button></div>').join('')+'</section>';
   return h }
 
 // ---------- окна ----------
 function closeOverlay(){ S.overlay=null; $('#overlay').innerHTML='' }
-function openOverlay(o){ S.overlay=o; ({fields:drawFieldsEditor,mailcompose:drawMailCompose,mailboxes:drawMailBoxes,deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
+function openOverlay(o){ S.overlay=o; ({reqfill:drawReqFill,stagereq:drawStageReq,fields:drawFieldsEditor,mailcompose:drawMailCompose,mailboxes:drawMailBoxes,deal:drawDeal,task:drawTask,contact:drawContact,company:drawCompany,member:drawMember,dept:drawDept})[o.kind](); applyLock(o) }
 function applyLock(o){ const root=$('#overlay'); applyPerms(root); const ent={deal:'deals',task:'tasks',contact:'contacts',company:'companies'}[o.kind];
   if(!ent||o.isNew||S.overlay!==o) return; const rec=S[ent][o.id]; if(!rec) return; const ed=can(ent,'edit',rec), dl=can(ent,'del',rec);
   root.querySelectorAll('[data-a="deal-del"],[data-a="task-del"],[data-a="contact-del"],[data-a="company-del"]').forEach(b=>{ b.hidden=!dl });
@@ -1046,12 +1087,19 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
   const id=o.isNew?newId():o.id; const prev=o.isNew?null:S.deals[id];
   const d=Object.assign({},prev||{createdAt:now(),notes:[]},{title,pipeline:$('#d-pipe').value,budget:Math.max(0,Math.round(+$('#d-budget').value||0)),owner:$('#d-owner').value,contact,company,
     tags:$('#d-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,10),f:cf.values,updatedAt:now()});
-  applyStage(d,$('#d-stage').value,prev);
+  const toStage=$('#d-stage').value;
+  if(!prev||prev.stage!==toStage||(prev.pipeline||'main')!==d.pipeline){ const miss=missingFor(d,d.pipeline||MAIN,toStage);
+    if(miss.length){ toast('Чтобы перевести на этап «'+stageOf(toStage).name+'», заполните: '+miss.map(reqLabel).join(', ')); return } }
+  applyStage(d,toStage,prev);
   if(await put('deals',id,d)){ toast(o.isNew?'Сделка создана':'Сохранено'); if(o.isNew){ openOverlay({kind:'deal',id}) } else updateWa() } }
 function applyStage(d,stage,prev){ const old=prev?prev.stage:null; d.stage=stage;
   if(old!==stage){ d.notes=(d.notes||[]).concat([{sys:true,by:S.me,at:now(),text:old?'Этап: '+stageOf(old).name+' → '+stageOf(stage).name:'Сделка создана на этапе «'+stageOf(stage).name+'»'}]).slice(-200);
     if(stage===WON||stage===LOST) d.closedAt=now(); else delete d.closedAt } }
-async function moveDeal(id,stage){ const prev=S.deals[id]; if(!prev||prev.stage===stage) return; if(!can('deals','edit',prev)){ toast('Нет прав на изменение этой сделки'); render(true); return } const d=JSON.parse(JSON.stringify(prev)); d.updatedAt=now(); applyStage(d,stage,prev);
+async function moveDeal(id,stage){ const prev=S.deals[id]; if(!prev||prev.stage===stage) return; if(!can('deals','edit',prev)){ toast('Нет прав на изменение этой сделки'); render(true); return }
+  const miss=missingFor(prev,dealPipe(prev),stage);
+  if(miss.length){ toast('Нельзя перевести на «'+stageOf(stage).name+'»: заполните '+miss.map(reqLabel).join(', ')); render(true);
+    const back=S.overlay&&S.overlay.kind==='deal'?{kind:'deal',id}:null; openOverlay({kind:'reqfill',id,stage,miss,back}); return }
+  const d=JSON.parse(JSON.stringify(prev)); d.updatedAt=now(); applyStage(d,stage,prev);
   if(await put('deals',id,d)&&(stage===WON||stage===LOST)) toast(stage===WON?'Сделка закрыта успешно':'Сделка закрыта с отказом') }
 
 function drawTask(){ const o=S.overlay; const t=o.isNew?{text:'',type:'Звонок',due:(()=>{const d=new Date();d.setHours(d.getHours()+1,0,0,0);return d.toISOString()})(),owner:S.me,deal:o.deal||''}:S.tasks[o.id];
@@ -1236,6 +1284,16 @@ const A={
   'fe-del':el=>{ feCollect(); S.overlay.list.splice(+el.dataset.i,1); drawFieldsEditor() },
   'fe-up':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i>0){ [L[i-1],L[i]]=[L[i],L[i-1]] } drawFieldsEditor() },
   'fe-down':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i<L.length-1){ [L[i+1],L[i]]=[L[i],L[i+1]] } drawFieldsEditor() },
+  'stagereq-open':()=>{ if(!isBoss()) return; const o=S.overlay; const pid=o&&o.back&&S.deals[o.back.id]?dealPipe(S.deals[o.back.id]):pipeOf(S.pipe).id;
+    openOverlay({kind:'stagereq',pid,back:o&&o.kind==='fields'?{kind:'fields',back:o.back}:o&&o.back?o.back:null}) },
+  'sr-save':async()=>{ const o=S.overlay; if(await saveConfig('stagerules',{rules:o.rules})){ toast('Обязательные поля сохранены'); backOrClose() } },
+  'rq-save':async()=>{ const o=S.overlay, prev=S.deals[o.id]; if(!prev) return closeOverlay(); const d=JSON.parse(JSON.stringify(prev)); d.f=d.f||{};
+    o.miss.forEach(k=>{ if(k==='budget') d.budget=Math.max(0,Math.round(+(($('#rq-budget')||{}).value)||0));
+      else if(k==='owner'||k==='contact'||k==='company') d[k]=($('#rq-'+k)||{}).value||'';
+      else { const f=dealFields().find(x=>x.id===k); if(f){ const v=readField(f); if(emptyVal(v)) delete d.f[k]; else d.f[k]=v } } });
+    const still=missingFor(d,dealPipe(d),o.stage); if(still.length){ toast('Ещё не заполнено: '+still.map(reqLabel).join(', ')); return }
+    d.updatedAt=now(); applyStage(d,o.stage,prev);
+    if(await put('deals',o.id,d)){ toast('Сделка переведена на «'+stageOf(o.stage).name+'»'); backOrClose() } },
   'fe-save':async()=>{ feCollect(); const L=S.overlay.list;
     const bad=L.find(f=>!f.name); if(bad){ toast('У каждого поля должно быть название'); return }
     const noOpts=L.find(f=>HAS_OPTS(f.type)&&!(f.options||[]).length); if(noOpts){ toast('Добавьте варианты для поля «'+noOpts.name+'»'); return }
@@ -1284,6 +1342,10 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
+  else if(a==='sr-pipe'){ S.overlay.pid=el.value; S.overlay.openStage=null; drawStageReq() }
+  else if(a==='sr-toggle'){ const o=S.overlay, s=el.dataset.s, k=el.value; o.rules[o.pid]=o.rules[o.pid]||{}; const cur=(o.rules[o.pid][s]||[]).filter(x=>x!==k);
+    if(el.checked) cur.push(k); if(cur.length) o.rules[o.pid][s]=cur; else delete o.rules[o.pid][s];
+    const sum=$('#sr-sum-'+CSS.escape(s)); if(sum) sum.textContent=cur.length?cur.map(reqLabel).filter(Boolean).join(', '):'нет обязательных' }
   else if(a==='mb-email'){ const p=mailPreset(el.value); if(p){ $('#mb-imap').value=p[2]; $('#mb-imap-port').value=p[3]; $('#mb-smtp').value=p[4]; $('#mb-smtp-port').value=p[5]; $('#mb-hint').textContent='Это '+p[1]+'. Пароль для приложений создаётся здесь: '+p[6]+'.' } }
   else if(a==='gen-set'){ const k=el.dataset.k; let v=el.value; if(k==='hour12') v=v==='true'; if(k==='account') v=v.trim().slice(0,60);
     saveConfig('general',{[k]:v}).then(ok=>{ if(ok){ toast('Сохранено'); el.blur(); render(true) } }) }
