@@ -200,6 +200,18 @@ td.r,th.r{text-align:right}
 .cf-multi .chk-l{font-size:12.5px;padding:4px 8px}
 .fe-row{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}
 .fe-head{display:flex;gap:6px;align-items:center}
+.lf-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.lf-item{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.lf-item .inp{width:auto;min-width:150px;max-width:240px;text-transform:none;letter-spacing:0;color:var(--fg);font-weight:600}
+.lf-sum{margin-left:auto;font-weight:800;align-self:center}
+.lf-cols{position:relative}
+.lf-cols summary{list-style:none}
+.lf-cols summary::-webkit-details-marker{display:none}
+.lf-pop{position:absolute;z-index:5;top:calc(100% + 6px);left:0;width:min(420px,80vw);display:flex;flex-wrap:wrap;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;box-shadow:var(--shadow)}
+.lf-pop .chk-l{font-size:12.5px;padding:4px 8px}
+.lf-th{cursor:pointer;user-select:none;white-space:nowrap}
+.lf-th:hover{color:var(--fg)}
+.lf-table{min-width:900px}
 .sr-stage summary{cursor:pointer;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 .sr-stage .sr-sum{color:var(--muted);font-size:12.5px}
 .sr-stage[open] summary{margin-bottom:8px}
@@ -736,6 +748,43 @@ function vHome(){
 const tile=(k,v,s)=>'<div class="tile"><span class="k">'+k+'</span><span class="v num">'+esc(v)+'</span><span class="s">'+s+'</span></div>';
 function plural(n,a,b,c){ n=Math.abs(n)%100; const n1=n%10; if(n>10&&n<20) return c; if(n1>1&&n1<5) return b; if(n1===1) return a; return c }
 
+// ---------- Список сделок с фильтрами ----------
+function lfGet(){ if(!S.lf){ let s={}; try{ s=JSON.parse(localStorage.getItem('broks.lf')||'{}') }catch(e){}
+  S.lf=Object.assign({stage:'open',period:'all',field:'',fval:'',sort:'updatedAt',dir:'desc',cols:[]},s); if(!Array.isArray(S.lf.cols)) S.lf.cols=[] } return S.lf }
+function lfSave(){ try{ localStorage.setItem('broks.lf',JSON.stringify(S.lf)) }catch(e){} }
+function periodFrom(p){ const d=dayStart(); if(p==='today') return d; if(p==='week') return dayStart(-6);
+  if(p==='month'){ d.setDate(1); return d } if(p==='quarter'){ d.setDate(1); d.setMonth(Math.floor(d.getMonth()/3)*3); return d } return null }
+const fieldText=v=>Array.isArray(v)?v.join(', '):v===true?'Да':v==null?'':String(v);
+function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields(), optFields=fs.filter(f=>HAS_OPTS(f.type));
+  if(!['open','all','won','lost'].includes(lf.stage)&&!sts.some(s=>s.id===lf.stage)) lf.stage='open';
+  let deals=all;
+  if(lf.stage==='open') deals=deals.filter(isOpen); else if(lf.stage==='won') deals=deals.filter(d=>d.stage===WON); else if(lf.stage==='lost') deals=deals.filter(d=>d.stage===LOST); else if(lf.stage!=='all') deals=deals.filter(d=>d.stage===lf.stage);
+  const from=periodFrom(lf.period); if(from) deals=deals.filter(d=>d.createdAt&&new Date(d.createdAt)>=from);
+  const ff=fs.find(f=>f.id===lf.field);
+  if(ff&&lf.fval){ deals=deals.filter(d=>{ const v=(d.f||{})[ff.id]; if(lf.fval==='__empty') return emptyVal(v); return Array.isArray(v)?v.includes(lf.fval):v===lf.fval }) }
+  const stIdx=id=>{ const i=sts.findIndex(s=>s.id===id); return i<0?(id===WON?900:id===LOST?901:999):i };
+  const key={title:d=>(d.title||'').toLowerCase(),stage:d=>stIdx(d.stage),budget:d=>+d.budget||0,contact:d=>((S.contacts[d.contact]||{}).name||'').toLowerCase(),owner:d=>memberName(d.owner).toLowerCase(),createdAt:d=>d.createdAt||'',updatedAt:d=>d.updatedAt||''}[lf.sort]||(d=>fieldText((d.f||{})[lf.sort]).toLowerCase());
+  deals=deals.slice().sort((a,b)=>{ const x=key(a), y=key(b); const r=x<y?-1:x>y?1:0; return lf.dir==='asc'?r:-r });
+  const sum=deals.reduce((s,d)=>s+(+d.budget||0),0);
+  const sel=(k,opts,v,label)=>'<label class="lf-item"><span>'+label+'</span><select class="inp" id="lf-'+k+'" data-a="lf" data-k="'+k+'">'+opts+'</select></label>';
+  const o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(l)+'</option>';
+  let h='<div class="lf-bar">'+
+    sel('stage',o('open','В работе (все этапы)',lf.stage)+o('all','Все сделки',lf.stage)+'<optgroup label="Этап">'+sts.map(s=>o(s.id,s.name,lf.stage)).join('')+'</optgroup>'+o('won','Успешно реализовано',lf.stage)+o('lost','Закрыто: отказ',lf.stage),lf.stage,'Этап')+
+    sel('period',o('all','За всё время',lf.period)+o('today','Сегодня',lf.period)+o('week','7 дней',lf.period)+o('month','Этот месяц',lf.period)+o('quarter','Этот квартал',lf.period),lf.period,'Создана')+
+    (optFields.length?sel('field',o('','— не выбрано —',lf.field)+optFields.map(f=>o(f.id,f.name,lf.field)).join(''),lf.field,'Поле')+
+      (ff?sel('fval',o('','любое значение',lf.fval)+o('__empty','не заполнено',lf.fval)+(ff.options||[]).map(x=>o(x,x,lf.fval)).join(''),lf.fval,'Значение'):''):'')+
+    (fs.length?'<details class="lf-cols"><summary class="btn sm">Колонки'+(lf.cols.length?' · '+lf.cols.length:'')+'</summary><div class="lf-pop">'+fs.map((f,i)=>'<label class="chk-l"><input type="checkbox" id="lfc-'+i+'" data-a="lf-col" value="'+esc(f.id)+'"'+(lf.cols.includes(f.id)?' checked':'')+'> '+esc(f.name)+'</label>').join('')+'</div></details>':'')+
+    ((lf.stage!=='open'||lf.period!=='all'||lf.fval)?'<button class="btn sm ghost" data-a="lf-reset">Сбросить</button>':'')+
+    '<span class="lf-sum num">'+deals.length+' '+plural(deals.length,'сделка','сделки','сделок')+' · '+rub(sum)+'</span></div>';
+  if(!deals.length) return h+'<div class="panel">'+emptyBox('Сделок не найдено',S.q||lf.fval||lf.period!=='all'?'Измените фильтры или поиск.':'Добавьте сделку кнопкой «+ Сделка».')+'</div>';
+  const cols=[['title','Сделка'],['stage','Этап'],['budget','Бюджет','r'],['contact','Контакт'],['owner','Ответственный'],['createdAt','Создана'],['updatedAt','Обновлена']].concat(lf.cols.map(id=>{ const f=fs.find(x=>x.id===id); return f?[f.id,f.name]:null }).filter(Boolean));
+  const th=c=>'<th class="'+(c[2]||'')+' lf-th" data-a="lf-sort" data-k="'+esc(c[0])+'">'+esc(c[1])+(lf.sort===c[0]?(lf.dir==='asc'?' ↑':' ↓'):'')+'</th>';
+  h+='<div class="tablewrap"><table class="lf-table"><thead><tr>'+cols.map(th).join('')+'</tr></thead><tbody>'+deals.map(d=>{ const st=stageOf(d.stage), c=S.contacts[d.contact], co=S.companies[d.company];
+    return '<tr data-a="open-deal" data-id="'+esc(d.id)+'"><td><b>'+esc(d.title)+'</b>'+(d.unread>0?' <span class="pill ok">💬 '+d.unread+'</span>':'')+(co?'<div style="color:var(--muted);font-size:12.5px">'+esc(co.name)+'</div>':'')+'</td>'+
+      '<td><span class="pill '+(d.stage===WON?'ok':d.stage===LOST?'bad':'')+'"><i style="background:'+st.color+'"></i>'+esc(st.name)+'</span></td><td class="r num"><b>'+rub(d.budget)+'</b></td><td>'+esc(c?c.name:'—')+(c&&c.phone?'<div class="num" style="color:var(--muted);font-size:12.5px">'+esc(c.phone)+'</div>':'')+'</td><td>'+esc(memberName(d.owner))+'</td>'+
+      '<td class="num">'+esc(fmtDate(d.createdAt))+'</td><td class="num">'+esc(fmtDate(d.updatedAt))+'</td>'+
+      lf.cols.map(id=>fs.some(f=>f.id===id)?'<td>'+esc(fieldText((d.f||{})[id])||'—')+'</td>':'').join('')+'</tr>' }).join('')+'</tbody></table></div>';
+  return h }
 function vDeals(){
   const vp=pipelines().filter(p=>pipeOk(p.id));
   if(!vp.length) return '<div class="vh"><h1>Сделки</h1></div><div class="panel">'+emptyBox('Нет доступных воронок','Попросите руководителя открыть вам доступ к воронке.')+'</div>';
@@ -755,12 +804,7 @@ function vDeals(){
     h+='<div class="dropbar"><div class="drop ok" data-drop="'+WON+'">Успешно реализовано</div><div class="drop bad" data-drop="'+LOST+'">Закрыто: отказ</div><div class="drop" data-drop="__delete">Удалить сделку</div></div>';
     h+='<p class="notice" style="margin:0">Перетащите карточку в другой этап или вниз, чтобы закрыть сделку. На телефоне этап меняется в карточке сделки.</p>';
   } else {
-    if(S.dealsStatus==='open') deals=deals.filter(isOpen); else if(S.dealsStatus==='won') deals=deals.filter(d=>d.stage===WON); else if(S.dealsStatus==='lost') deals=deals.filter(d=>d.stage===LOST);
-    deals.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
-    h+='<div class="seg">'+[['open','В работе'],['won','Успешные'],['lost','Отказ'],['all','Все']].map(([k,l])=>'<button data-a="deals-status" data-v="'+k+'" aria-pressed="'+(S.dealsStatus===k)+'">'+l+'</button>').join('')+'</div>';
-    h+=deals.length?'<div class="tablewrap"><table><thead><tr><th>Сделка</th><th>Этап</th><th class="r">Бюджет</th><th>Контакт</th><th>Ответственный</th><th>Обновлено</th></tr></thead><tbody>'+deals.map(d=>{ const st=stageOf(d.stage), c=S.contacts[d.contact], co=S.companies[d.company];
-      return '<tr data-a="open-deal" data-id="'+esc(d.id)+'"><td><b>'+esc(d.title)+'</b>'+(co?'<div style="color:var(--muted);font-size:12.5px">'+esc(co.name)+'</div>':'')+'</td><td><span class="pill '+(d.stage===WON?'ok':d.stage===LOST?'bad':'')+'"><i style="background:'+st.color+'"></i>'+esc(st.name)+'</span></td><td class="r num"><b>'+rub(d.budget)+'</b></td><td>'+esc(c?c.name:'—')+'</td><td>'+esc(memberName(d.owner))+'</td><td class="num">'+esc(fmtDate(d.updatedAt))+'</td></tr>' }).join('')+'</tbody></table></div>'
-      :'<div class="panel">'+emptyBox('Сделок не найдено',S.q?'Измените поисковый запрос.':'Добавьте сделку кнопкой «+ Сделка».')+'</div>';
+    h+=dealsList(deals,pid);
   }
   return h }
 function pipeTabs(pid,counts){ return '<div class="pipes" role="tablist" aria-label="Воронки">'+pipelines().filter(p=>pipeOk(p.id)).map(p=>'<button role="tab" class="btn sm'+(p.id===pid?' primary':'')+'" aria-selected="'+(p.id===pid)+'" data-a="pipe-pick" data-v="'+esc(p.id)+'">'+esc(p.name)+(counts?' <span class="num" style="opacity:.7">'+vis('deals').filter(d=>dealPipe(d)===p.id&&isOpen(d)).length+'</span>':'')+'</button>').join('')+(isBoss()?'<button class="btn sm ghost" data-a="pipe-add">+ Воронка</button>':'')+'</div>' }
@@ -1284,6 +1328,8 @@ const A={
   'fe-del':el=>{ feCollect(); S.overlay.list.splice(+el.dataset.i,1); drawFieldsEditor() },
   'fe-up':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i>0){ [L[i-1],L[i]]=[L[i],L[i-1]] } drawFieldsEditor() },
   'fe-down':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i<L.length-1){ [L[i+1],L[i]]=[L[i],L[i+1]] } drawFieldsEditor() },
+  'lf-sort':el=>{ const lf=lfGet(), k=el.dataset.k; if(lf.sort===k) lf.dir=lf.dir==='asc'?'desc':'asc'; else { lf.sort=k; lf.dir=k==='title'||k==='contact'||k==='owner'?'asc':'desc' } lfSave(); render(true) },
+  'lf-reset':()=>{ const lf=lfGet(); Object.assign(lf,{stage:'open',period:'all',field:'',fval:''}); lfSave(); render(true) },
   'stagereq-open':()=>{ if(!isBoss()) return; const o=S.overlay; const pid=o&&o.back&&S.deals[o.back.id]?dealPipe(S.deals[o.back.id]):pipeOf(S.pipe).id;
     openOverlay({kind:'stagereq',pid,back:o&&o.kind==='fields'?{kind:'fields',back:o.back}:o&&o.back?o.back:null}) },
   'sr-save':async()=>{ const o=S.overlay; if(await saveConfig('stagerules',{rules:o.rules})){ toast('Обязательные поля сохранены'); backOrClose() } },
@@ -1342,6 +1388,8 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
+  else if(a==='lf'){ const lf=lfGet(), k=el.dataset.k; lf[k]=el.value; if(k==='field') lf.fval=''; lfSave(); el.blur(); render(true) }
+  else if(a==='lf-col'){ const lf=lfGet(), v=el.value; lf.cols=lf.cols.filter(x=>x!==v); if(el.checked) lf.cols.push(v); lfSave(); S.lfColsOpen=true; render(true); const dd=$('.lf-cols'); if(dd) dd.open=true }
   else if(a==='sr-pipe'){ S.overlay.pid=el.value; S.overlay.openStage=null; drawStageReq() }
   else if(a==='sr-toggle'){ const o=S.overlay, s=el.dataset.s, k=el.value; o.rules[o.pid]=o.rules[o.pid]||{}; const cur=(o.rules[o.pid][s]||[]).filter(x=>x!==k);
     if(el.checked) cur.push(k); if(cur.length) o.rules[o.pid][s]=cur; else delete o.rules[o.pid][s];
