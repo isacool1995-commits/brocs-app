@@ -72,6 +72,27 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .nav a[aria-current="page"]{background:var(--rail-2);color:var(--rail-hi);box-shadow:inset 3px 0 0 var(--accent)}
 .nav svg{width:18px;height:18px;flex:none}
 .nav .cnt{margin-left:auto;font-size:11px;background:var(--bad);color:#fff;border-radius:99px;padding:0 7px;line-height:18px}
+.bell{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:8px;color:var(--rail-fg);background:none;border:0;font:inherit;font-weight:600;cursor:pointer;margin-top:auto;width:100%;text-align:left;position:relative;white-space:nowrap}
+.bell:hover,.bell[aria-expanded="true"]{background:var(--rail-2);color:var(--rail-hi)}
+.bell svg{width:18px;height:18px;flex:none}
+.bell .cnt{margin-left:auto;font-size:11px;background:var(--bad);color:#fff;border-radius:99px;padding:0 7px;line-height:18px}
+.bell+.rail-foot{margin-top:0}
+.ntf-scrim{position:fixed;inset:0;z-index:44}
+.ntf{position:fixed;left:220px;top:0;bottom:0;width:min(400px,calc(100vw - 220px));z-index:45;background:var(--surface);border-right:1px solid var(--line);box-shadow:10px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.ntf>header{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.ntf>header h2{font-size:17px;margin-right:auto}
+.ntf-list{overflow-y:auto;flex:1;display:flex;flex-direction:column}
+.ntf-it{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:var(--fg);padding:11px 16px;cursor:pointer}
+.ntf-it:hover{background:var(--surface-2)}
+.ntf-it.new{background:var(--accent-soft)}
+.ntf-it .grow{min-width:0;display:flex;flex-direction:column;gap:2px}
+.ntf-it b{font-size:13.5px}
+.ntf-tx{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.ntf-it time{font-size:12px;color:var(--muted);white-space:nowrap}
+.ntf-ic{font-size:17px;line-height:1.2}
+.ntf-perm{margin:10px 16px 0;border:1px dashed var(--line);background:none;border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;color:var(--accent);cursor:pointer;text-align:left}
+.ntf-pop{position:fixed;left:236px;bottom:16px;z-index:46;display:flex;flex-direction:column;gap:8px;width:min(340px,calc(100vw - 32px))}
+.ntf-pop .ntf-it{border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .rail-foot{margin-top:auto;font-size:12px;opacity:.8;padding:0 6px;display:flex;flex-direction:column;gap:6px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
 
@@ -341,7 +362,11 @@ table.perm select{font-weight:700;height:32px}
   .brand>span,.rail-foot{display:none}
   .nav a{justify-content:center;padding:10px;position:relative}
   .nav a span.lbl{display:none}
-  .nav .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
+  .nav .cnt,.bell .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
+  .bell{justify-content:center;padding:10px;width:auto}
+  .bell .lbl{display:none}
+  .ntf{left:64px;width:calc(100vw - 64px)}
+  .ntf-pop{left:16px}
   .me span,.wa-st em{display:none}
   .col{max-height:none}
 }
@@ -355,6 +380,7 @@ table.perm select{font-weight:700;height:32px}
       <span><b>Брокс</b><small>CRM команды</small></span>
     </a>
     <nav class="nav" id="nav"></nav>
+    <button type="button" class="bell" id="bell" data-a="ntf-toggle" aria-expanded="false" hidden></button>
     <div class="rail-foot" id="railfoot"></div>
   </aside>
   <div class="main">
@@ -408,10 +434,13 @@ table.perm select{font-weight:700;height:32px}
 <div id="overlay"></div>
 <div id="confirmLayer"></div>
 <div id="toastLayer"></div>
+<div id="ntfLayer"></div>
+<div id="ntfPop" class="ntf-pop" aria-live="polite"></div>
 
 <script>
 (function(){
 const ICONS={
+  bell:'<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   home:'<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/>',
   deals:'<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/>',
   tasks:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/>',
@@ -572,7 +601,8 @@ function reloadSoon(){ clearTimeout(reloadT); reloadT=setTimeout(()=>{ loadAll()
 function subscribe(){
   live=sb.channel('docs-live').on('postgres_changes',{event:'*',schema:'public',table:'docs'},p=>{
     if(p.eventType==='DELETE'){ const o=p.old||{}; if(S[o.col]) delete S[o.col][o.id] }
-    else { const n=p.new||{}; if(S[n.col]) S[n.col][n.id]=n.data; if(n.col==='members'&&n.id===S.me||n.col==='roles') reloadSoon() }
+    else { const n=p.new||{}; const fresh=S[n.col]&&!S[n.col][n.id]; if(S[n.col]) S[n.col][n.id]=n.data; if(n.col==='members'&&n.id===S.me||n.col==='roles') reloadSoon();
+      if(fresh||n.col==='deals') try{ ntfLive(n) }catch(e){} }
     render() }).subscribe();
   setInterval(()=>{ if(document.visibilityState==='visible') reloadSoon() },60000);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') reloadSoon() }) }
@@ -657,6 +687,7 @@ function render(force){
   html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup,settings:vSettings,mail:vMail}[S.view])();
   main.innerHTML=html; applyPerms(main);
   if(S.overlay&&S.overlay.kind==='deal'&&!S.overlay.isNew){ renderDealLive(); updateWa() }
+  renderBell(); if(S.ntfOpen) drawNtf()
 }
 document.addEventListener('focusout',()=>{ setTimeout(()=>{ if(pendingRender) render() },0) });
 
@@ -1160,7 +1191,7 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
   const fld=(k,v)=>'<div style="min-width:0"><div class="fk">'+k+'</div><div style="font-weight:700;overflow-wrap:anywhere">'+(v?esc(v):'<span style="color:var(--warn)">не заполнено</span>')+'</div></div>';
   const cb=$('#clientBox'); if(cb) cb.innerHTML=co?'<section class="panel"><header><h2>Клиент: '+esc(co.name)+'</h2><button class="btn sm" data-a="open-company" data-id="'+esc(d.company)+'">Изменить</button></header><div class="grid2" style="padding:12px 16px;gap:12px 16px">'+fld('Город',co.city)+fld('ИП или ТОО',co.form)+fld('Налоговый режим',co.tax)+fld('БИН / ИИН',co.bin)+fld('Кто оплачивает',co.payer)+fld('Способ оплаты',co.pay)+fld('WhatsApp',ph?fmtPhone(ph):'')+'</div></section>'
     :'<section class="panel">'+emptyBox('Клиент не выбран','Выберите бренд в поле «Клиент» и сохраните сделку.')+'</section>';
-  const items=(d.notes||[]).map(n=>({at:n.at||'',kind:n.kind||(n.sys?'sys':'note'),n}));
+  const items=(d.notes||[]).map(n=>({at:n.at||'',kind:n.sys?'sys':(n.kind||'note'),n}));
   vis('tasks').filter(t=>t.deal===o.id).forEach(t=>items.push({at:t.createdAt||t.due||'',kind:'task',t}));
   const cEmail=String((S.contacts[d.contact]||{}).email||'').toLowerCase();
   vis('mail').filter(m=>m.deal===o.id||(cEmail&&String(mailPeer(m).email||'').toLowerCase()===cEmail)).forEach(m=>items.push({at:m.date||'',kind:'mail',m}));
@@ -1207,6 +1238,9 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
   const id=o.isNew?newId():o.id; const prev=o.isNew?null:S.deals[id];
   const d=Object.assign({},prev||{createdAt:now(),notes:[]},{title,pipeline:$('#d-pipe').value,budget:Math.max(0,Math.round(+$('#d-budget').value||0)),owner:$('#d-owner').value,contact,company,
     tags:dealTags().slice(0,20),f:cf.values,updatedAt:now()});
+  // Смена ответственного попадает в историю сделки; новый ответственный получит уведомление.
+  if(d.owner&&d.owner!==S.me&&(prev?prev.owner!==d.owner:true)) d.notes=(d.notes||[]).concat([{sys:true,kind:'owner',by:S.me,to:d.owner,at:now(),text:prev?'Ответственный: '+memberName(prev.owner)+' → '+memberName(d.owner):'Ответственный: '+memberName(d.owner)}]).slice(-300);
+  else if(prev&&prev.owner!==d.owner) d.notes=(d.notes||[]).concat([{sys:true,by:S.me,at:now(),text:'Ответственный: '+memberName(prev.owner)+' → '+memberName(d.owner)}]).slice(-300);
   const toStage=$('#d-stage').value;
   if(!prev||prev.stage!==toStage||(prev.pipeline||'main')!==d.pipeline){ const miss=missingFor(d,d.pipeline||MAIN,toStage);
     if(miss.length){ toast('Чтобы перевести на этап «'+stageOf(toStage).name+'», заполните: '+miss.map(reqLabel).join(', ')); return } }
@@ -1299,6 +1333,56 @@ async function saveMember(){ const o=S.overlay; const name=$('#m-name').value.tr
 
 function confirmBox(text,yesLabel,onYes,note){ if(note==null) note='Это действие нельзя отменить.'; $('#confirmLayer').innerHTML='<div class="scrim top2" data-a="confirm-no"></div><div class="modal confirm" role="alertdialog" aria-modal="true"><div class="mb" style="padding-top:18px"><b style="font-size:16px">'+esc(text)+'</b>'+(note?'<span style="color:var(--muted)">'+esc(note)+'</span>':'')+'</div><footer><button class="btn" data-a="confirm-no">Отмена</button><button class="btn primary" style="background:var(--bad);border-color:var(--bad);color:#fff" data-a="confirm-yes">'+esc(yesLabel)+'</button></footer></div>';
   confirmBox.cb=onYes; $('#confirmLayer [data-a="confirm-yes"]').focus() }
+// ---------- Уведомления (колокольчик внизу меню, как в amoCRM) ----------
+// Список собирается из данных: сообщения клиентов по моим и нераспределённым сделкам, переданные мне сделки,
+// задачи от коллег и просроченные задачи, непрочитанные письма. Что уже просмотрено, помним в этом браузере.
+const NTF_DAYS=14;
+const ntfKey=()=>'broks.ntf.'+S.me;
+function ntfSeen(){ try{ return localStorage.getItem(ntfKey())||'' }catch(e){ return '' } }
+function ntfMark(){ try{ localStorage.setItem(ntfKey(),now()) }catch(e){} }
+const myDeal=d=>!!d&&(d.owner===S.me||!d.owner);
+const CH_NAMES={whatsapp:'WhatsApp',telegram:'Telegram',max:'MAX'};
+function chatNtf(c){ const d=S.deals[c.deal]; return {at:c.at,icon:'💬',title:(c.name||clientName(d))+' · '+(CH_NAMES[c.channel]||c.channel),text:c.text||'📎 Файл',deal:c.deal} }
+function notifications(){ if(!S.me) return []; const out=[], since=new Date(Date.now()-NTF_DAYS*864e5).toISOString(), nowIso=now();
+  list('chat').forEach(c=>{ if(c.dir==='in'&&c.at&&c.at>=since&&myDeal(S.deals[c.deal])) out.push(chatNtf(c)) });
+  vis('deals').forEach(d=>(d.notes||[]).forEach(n=>{ if(n.kind==='owner'&&n.to===S.me&&n.by!==S.me&&(n.at||'')>=since) out.push({at:n.at,icon:'👤',title:'Вам передали сделку',text:(d.title||'Без названия')+' · от '+memberName(n.by),deal:d.id}) }));
+  vis('tasks').forEach(t=>{ if(t.owner!==S.me||t.done) return;
+    if(t.by&&t.by!==S.me&&(t.createdAt||'')>=since) out.push({at:t.createdAt,icon:'📋',title:'Новая задача от '+memberName(t.by),text:t.text,task:t.id});
+    if(t.due&&t.due<nowIso&&t.due>=since) out.push({at:t.due,icon:'⏰',title:'Задача просрочена',text:t.text,task:t.id}) });
+  if(allowedViews().includes('mail')) vis('mail').forEach(m=>{ if(m.folder!=='in'||m.seen||!m.date||m.date<since) return; const f=m.from||{};
+    out.push({at:m.date,icon:'✉',title:'Письмо от '+(f.name||f.email||'неизвестного'),text:m.subject||'(без темы)',mail:m.id}) });
+  return out.sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,80) }
+const ntfWhen=iso=>fmtDate(iso)===fmtDate(now())?fmtTime(iso):fmtDate(iso,true);
+const ntfItem=(x,attr,isNew)=>'<button type="button" class="ntf-it'+(isNew?' new':'')+'" '+attr+'><span class="ntf-ic" aria-hidden="true">'+x.icon+'</span><span class="grow"><b>'+esc(x.title)+'</b><span class="ntf-tx">'+esc(x.text)+'</span></span><time class="num">'+esc(ntfWhen(x.at))+'</time></button>';
+function renderBell(){ const b=$('#bell'); if(!b) return; b.hidden=!S.me; if(!S.me) return;
+  const seen=ntfSeen(), n=S.ntfOpen?0:notifications().filter(x=>x.at>seen).length;
+  b.innerHTML=icon('bell')+'<span class="lbl">Уведомления</span>'+(n?'<span class="cnt num">'+(n>99?'99+':n)+'</span>':'');
+  b.setAttribute('aria-expanded',String(!!S.ntfOpen)); b.setAttribute('aria-label','Уведомления'+(n?': новых '+n:'')); b.title='Уведомления' }
+function drawNtf(){ const L=$('#ntfLayer'); if(!S.ntfOpen){ L.innerHTML=''; return }
+  const items=notifications(), prev=S.ntfPrev||''; S.ntfItems=items;
+  const perm=('Notification' in window)&&Notification.permission==='default';
+  L.innerHTML='<div class="ntf-scrim" data-a="ntf-close"></div><aside class="ntf" role="dialog" aria-label="Уведомления"><header><h2>Уведомления</h2><button type="button" class="btn sm ghost" data-a="ntf-close" aria-label="Закрыть">✕</button></header>'+
+    (perm?'<button type="button" class="ntf-perm" data-a="ntf-perm">🔔 Показывать уведомления на рабочем столе, даже когда вкладка свёрнута</button>':'')+
+    '<div class="ntf-list">'+(items.length?items.map((x,i)=>ntfItem(x,'data-a="ntf-go" data-i="'+i+'"',x.at>prev)).join(''):emptyBox('Уведомлений нет','Здесь появятся сообщения клиентов, переданные вам сделки, задачи и письма за последние '+NTF_DAYS+' дней.'))+'</div></aside>' }
+function ntfToggle(open){ if(open){ S.ntfPrev=ntfSeen(); S.ntfOpen=true; ntfMark() } else { S.ntfOpen=false; ntfMark() } drawNtf(); renderBell() }
+function ntfOpenItem(x){ if(!x) return; ntfToggle(false);
+  if(x.deal&&S.deals[x.deal]) openOverlay({kind:'deal',id:x.deal});
+  else if(x.task&&S.tasks[x.task]) openOverlay({kind:'task',id:x.task});
+  else if(x.mail&&S.mail[x.mail]){ if(S.overlay) closeOverlay(); S.mailFolder='in'; S.mailSel=x.mail; go('mail') } }
+// Всплывающее окно о новом событии внизу слева и уведомление Windows, если вкладка свёрнута.
+let popSeq=0; S.ntfPops={};
+function ntfPopup(x){ const id='p'+(++popSeq); S.ntfPops[id]=x; const box=$('#ntfPop');
+  box.insertAdjacentHTML('afterbegin',ntfItem(x,'data-a="ntf-pop" data-id="'+id+'" id="'+id+'"',true));
+  while(box.children.length>3) box.lastElementChild.remove();
+  setTimeout(()=>{ const el=document.getElementById(id); if(el) el.remove(); delete S.ntfPops[id] },10000);
+  if(document.visibilityState!=='visible'&&('Notification' in window)&&Notification.permission==='granted'){
+    try{ const n=new Notification(x.title,{body:x.text,tag:'broks-'+(x.deal||x.task||id)}); n.onclick=()=>{ window.focus(); ntfOpenItem(x); n.close() } }catch(e){} } }
+function ntfLive(n){ const v=n.data||{};
+  if(n.col==='chat'&&v.dir==='in'&&myDeal(S.deals[v.deal])) ntfPopup(chatNtf(v));
+  else if(n.col==='tasks'&&v.owner===S.me&&v.by&&v.by!==S.me) ntfPopup({at:v.createdAt||now(),icon:'📋',title:'Новая задача от '+memberName(v.by),text:v.text,task:n.id});
+  else if(n.col==='deals'){ const last=(v.notes||[]).slice(-1)[0], k=n.id+'|'+(last&&last.at); S.ntfShown=S.ntfShown||{};
+    if(last&&last.kind==='owner'&&last.to===S.me&&last.by!==S.me&&Date.now()-new Date(last.at)<120000&&!S.ntfShown[k]&&(S.ntfShown[k]=1)) ntfPopup({at:last.at,icon:'👤',title:'Вам передали сделку',text:(v.title||'Без названия')+' · от '+memberName(last.by),deal:n.id}) } }
+
 let toastT; function toast(t){ $('#toastLayer').innerHTML='<div class="toast" role="status">'+esc(t)+'</div>'; clearTimeout(toastT); toastT=setTimeout(()=>{$('#toastLayer').innerHTML=''},2600) }
 
 // ---------- действия ----------
@@ -1451,6 +1535,11 @@ const A={
     if(n){ toast('Сначала перенесите '+n+' '+plural(n,'сделку','сделки','сделок')+' из этого этапа'); return }
     if(stages().length<=1){ toast('В воронке должен остаться хотя бы один этап'); return }
     confirmBox('Удалить этап «'+stageOf(id).name+'»?','Удалить',()=>putStages(stages().filter(s=>s.id!==id))) },
+  'ntf-toggle':()=>ntfToggle(!S.ntfOpen),
+  'ntf-close':()=>ntfToggle(false),
+  'ntf-go':el=>ntfOpenItem((S.ntfItems||[])[+el.dataset.i]),
+  'ntf-pop':el=>{ const x=S.ntfPops[el.dataset.id]; el.remove(); ntfOpenItem(x) },
+  'ntf-perm':()=>{ Notification.requestPermission().then(()=>drawNtf()) },
   'tag-del':el=>{ const v=el.dataset.v; setDealTags(dealTags().filter(t=>t!==v)) },
   'wa-status':(el,e)=>{ e.preventDefault(); const s=waStatus(); if(isBoss()){ S.setTab='messaging'; go('settings') } else toast(s.text+'. '+s.hint) },
   'confirm-no':()=>{ $('#confirmLayer').innerHTML='' },
@@ -1460,7 +1549,7 @@ function moveStage(id,dir){ const st=stages().slice(); const i=st.findIndex(s=>s
 
 document.addEventListener('click',e=>{ const el=e.target.closest('[data-a]'); if(!el) return; const a=el.dataset.a;
   if(el.tagName==='SELECT'||el.tagName==='INPUT') return; if(A[a]) A[a](el,e) });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if($('#confirmLayer').innerHTML) $('#confirmLayer').innerHTML=''; else if(S.overlay) backOrClose() }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(S.ntfOpen) ntfToggle(false); else if($('#confirmLayer').innerHTML) $('#confirmLayer').innerHTML=''; else if(S.overlay) backOrClose() }
   if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('card')) A['open-deal'](e.target,e);
   if(e.target.id==='tagInp'){
     if(e.key==='Enter'||e.key===','){ e.preventDefault(); addDealTag(e.target.value) }
