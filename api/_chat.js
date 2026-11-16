@@ -42,4 +42,11 @@ async function ourNumbers() {
 }
 const isOur = (list, phone) => !list.length || list.includes(normPhone(phone));
 
-module.exports = { CHANNELS, ourNumbers, isOur, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };
+// Через какой сервис работают мессенджеры: «Настройки → Мессенджеры», иначе переменная Vercel MESSAGING_PROVIDER.
+async function provider() {
+  const cfg = await getDoc('config', 'messaging');
+  const p = (cfg && cfg.provider) || process.env.MESSAGING_PROVIDER || 'profitbot';
+  return p === 'brox' ? 'brox' : 'profitbot';
+}
+
+module.exports = { CHANNELS, provider, ourNumbers, isOur, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };

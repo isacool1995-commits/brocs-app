@@ -1099,24 +1099,36 @@ function drawMailBoxes(){ const boxes=S.boxes||[];
     '<button class="btn" data-a="close">Закрыть</button><button class="btn primary" data-a="mail-box-add">Проверить и подключить</button>') }
 // ---------- Настройки ----------
 const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность'],['messaging','Мессенджеры']];
-// Связь с ProfitBot считаем рабочей, если от него пришло хотя бы одно событие (тест или сообщение).
-function waStatus(){ const last=S.config&&S.config.messaging_last, snd=S.config&&S.config.messaging_send;
-  if(snd&&snd.ok===false&&snd.at&&(!last||!last.at||snd.at>last.at)) return {cls:'bad',icon:'✕',text:'WhatsApp отключён',hint:'Номер +'+snd.from+' отключён в ProfitBot ('+fmtDate(snd.at,true)+'). Нужно заново подключить его в кабинете ProfitBot'};
-  if(!last||!last.at) return {cls:'bad',icon:'✕',text:'WhatsApp не подключён',hint:'От ProfitBot ещё не пришло ни одного события'};
-  const days=Math.floor((Date.now()-new Date(last.at))/864e5), when='Последнее событие от ProfitBot: '+fmtDate(last.at,true);
+// Связь считаем рабочей, если от сервиса мессенджеров пришло хотя бы одно событие (тест или сообщение).
+const PROVIDERS={profitbot:'ProfitBot',brox:'Brox Connect'};
+function waProvider(){ const m=S.config&&S.config.messaging; return m&&m.provider==='brox'?'brox':'profitbot' }
+function waStatus(){ const last=S.config&&S.config.messaging_last, snd=S.config&&S.config.messaging_send, bx=S.config&&S.config.messaging_brox, pv=waProvider(), pn=PROVIDERS[pv];
+  const relink=pv==='brox'?'Откройте кабинет Brox Connect → «Номера» и отсканируйте QR-код':'Нужно заново подключить его в кабинете ProfitBot';
+  if(pv==='brox'&&bx&&(bx.status==='logged_out'||bx.status==='qr')&&bx.at&&(!last||!last.at||bx.at>=last.at)) return {cls:'bad',icon:'✕',text:'WhatsApp отключён',hint:'Номер'+(bx.phone?' +'+bx.phone:'')+' отвязан от Brox Connect ('+fmtDate(bx.at,true)+'). '+relink};
+  if(snd&&snd.ok===false&&snd.at&&(!last||!last.at||snd.at>last.at)) return {cls:'bad',icon:'✕',text:'WhatsApp отключён',hint:'Номер +'+snd.from+' отключён в '+pn+' ('+fmtDate(snd.at,true)+'). '+relink};
+  if(!last||!last.at) return {cls:'bad',icon:'✕',text:'WhatsApp не подключён',hint:'От '+pn+' ещё не пришло ни одного события'};
+  const days=Math.floor((Date.now()-new Date(last.at))/864e5), when='Последнее событие от '+(PROVIDERS[last.provider]||pn)+': '+fmtDate(last.at,true);
   if(days>7) return {cls:'warn',icon:'!',text:'WhatsApp: тишина '+days+' дн.',hint:when};
   return {cls:'ok',icon:'✓',text:'WhatsApp подключён',hint:when} }
 function waBadge(){ const s=waStatus(); return '<a class="pill '+s.cls+' wa-st" href="#settings" data-a="wa-status" title="'+esc(s.hint)+'" aria-label="'+esc(s.text+'. '+s.hint)+'"><b aria-hidden="true">'+s.icon+'</b><em>'+esc(s.text)+'</em></a>' }
-function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.config&&S.config.messaging_last)||null, hook='https://jlundeidupshqltjjrva.supabase.co/functions/v1/wa-relay';
+function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.config&&S.config.messaging_last)||null, pv=waProvider(), pn=PROVIDERS[pv];
+  const hook=pv==='brox'?location.origin+'/api/brox-webhook':'https://jlundeidupshqltjjrva.supabase.co/functions/v1/wa-relay';
   const evName={test:'тест из кабинета','message.incoming':'входящее сообщение','message.outgoing':'исходящее сообщение','message.status':'статус сообщения'};
   let h='<div class="vh"><h1>Мессенджеры</h1></div>';
-  h+='<section class="panel"><header><h2>WhatsApp, Telegram, MAX через ProfitBot</h2></header><div class="set-grid">'+
+  h+='<section class="panel"><header><h2>Сервис подключения</h2></header><div class="set-grid">'+
+    '<label class="set-row"><span>Через что работает WhatsApp</span><select class="inp" id="msg-provider" data-a="msg-provider">'+
+      Object.entries(PROVIDERS).map(([k,l])=>'<option value="'+k+'"'+(k===pv?' selected':'')+'>'+(k==='brox'?'Brox Connect (свой сервис, QR-код)':'ProfitBot (WhatsApp, Telegram, MAX)')+'</option>').join('')+'</select></label>'+
+    '</div><p class="set-hint">'+(pv==='brox'
+      ?'Сообщения идут через ваш сервис Brox Connect. Нужны переменные Vercel: <code>BROX_API_URL</code>, <code>BROX_API_KEY</code> и <code>BROX_WEBHOOK_SECRET</code> (ключ и секрет — в кабинете Brox Connect → «Настройки»). Telegram и MAX через Brox Connect не работают.'
+      :'Сообщения идут через ProfitBot. Чтобы перейти на Brox Connect, выберите его здесь — переписка в сделках сохранится.')+'</p></section>';
+  h+='<section class="panel"><header><h2>WhatsApp'+(pv==='brox'?'':', Telegram, MAX')+' через '+pn+'</h2></header><div class="set-grid">'+
     '<label class="set-row"><span>Номер для «Брокс»</span><input class="inp num" id="msg-numbers" data-a="msg-numbers" value="'+esc(m.numbers||'')+'" placeholder="77476754306"></label>'+
     '<div class="set-row"><span>Адрес вебхука</span><div class="crow"><code class="num" style="overflow-wrap:anywhere">'+esc(hook)+'</code><button type="button" class="btn sm" data-a="copy" data-v="'+esc(hook)+'">Копировать</button></div></div>'+
-    '</div><p class="set-hint">«Брокс» принимает и отправляет сообщения только с этого номера. Сообщения других номеров вашего аккаунта ProfitBot, например подключённых к amoCRM, «Брокс» пропускает. Можно указать несколько номеров через запятую. Номер сохраняется, когда вы уходите из поля.</p></section>';
-  h+='<section class="panel"><header><h2>Связь с ProfitBot</h2>'+waBadge()+'</header><div class="permx" style="border-top:0">'+
-    (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>, '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
-      :'<p class="notice warn" style="margin:0">От ProfitBot ещё не пришло ни одного события. Проверьте в кабинете ProfitBot → «API», что адрес вебхука сохранён, и нажмите там «Отправить тест».</p>')+
+    '</div><p class="set-hint">«Брокс» принимает и отправляет сообщения только с этого номера. Сообщения других номеров вашего аккаунта '+pn+(pv==='brox'?'':', например подключённых к amoCRM,')+' «Брокс» пропускает. Можно указать несколько номеров через запятую. Номер сохраняется, когда вы уходите из поля.'+
+    (pv==='brox'?' Адрес вебхука вставьте в кабинете Brox Connect → «Настройки» → «Webhook».':'')+'</p></section>';
+  h+='<section class="panel"><header><h2>Связь с '+pn+'</h2>'+waBadge()+'</header><div class="permx" style="border-top:0">'+
+    (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>'+(last.provider&&last.provider!==pv?' (от '+esc(PROVIDERS[last.provider]||last.provider)+')':'')+', '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
+      :'<p class="notice warn" style="margin:0">От '+pn+' ещё не пришло ни одного события. '+(pv==='brox'?'Проверьте в кабинете Brox Connect → «Настройки», что адрес вебхука сохранён, и нажмите там «Проверить».':'Проверьте в кабинете ProfitBot → «API», что адрес вебхука сохранён, и нажмите там «Отправить тест».')+'</p>')+
     '<span class="set-hint" style="margin:0">Страница обновляется сама, когда приходит событие.</span></div></section>';
   return h }
 const TIMEZONES=[['Asia/Almaty','(GMT +05:00) Алматы, Астана'],['Asia/Aqtobe','(GMT +05:00) Актобе, Атырау, Актау'],['Asia/Tashkent','(GMT +05:00) Ташкент'],['Asia/Bishkek','(GMT +06:00) Бишкек'],['Europe/Moscow','(GMT +03:00) Москва'],['Asia/Dubai','(GMT +04:00) Дубай'],['Europe/Istanbul','(GMT +03:00) Стамбул']];
@@ -1675,6 +1687,8 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
     if(el.id==='d-contact'){ $('#d-cph').hidden=el.value==='__new'; $('#d-cphone').value=(S.contacts[el.value]||{}).phone||'' } }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
+  else if(a==='msg-provider'){ const v=el.value==='brox'?'brox':'profitbot';
+    saveConfig('messaging',{provider:v}).then(ok=>{ if(ok){ toast('Мессенджеры работают через '+PROVIDERS[v]); render(true) } }) }
   else if(a==='msg-numbers'){ const v=el.value.split(/[,;\s]+/).map(normPhone).filter(Boolean).join(', '); el.value=v;
     saveConfig('messaging',{numbers:v}).then(ok=>{ if(ok) toast(v?'Номер сохранён':'Номер очищен') }) }
   else if(a==='lf'){ const lf=lfGet(), k=el.dataset.k; lf[k]=el.value; if(k==='field') lf.fval=''; lfSave(); el.blur(); render(true) }

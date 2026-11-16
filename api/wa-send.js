@@ -1,6 +1,7 @@
 // Отправка сообщения клиенту из карточки сделки через Profit Bot.
 const { URL_, ANON, caller, body, configured } = require('./_sb');
-const { CHANNELS, ourNumbers, isOur, normPhone, digits, getDoc, putDoc } = require('./_chat');
+const { CHANNELS, provider, ourNumbers, isOur, normPhone, digits, getDoc, putDoc } = require('./_chat');
+const brox = require('./_brox');
 
 const KEY = process.env.PROFITBOT_API_KEY || '';
 
@@ -8,7 +9,9 @@ module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Нужен POST-запрос.' });
   if (!configured()) return res.status(500).json({ error: 'Сервер не настроен: нет ключей Supabase.' });
-  if (!KEY) return res.status(500).json({ error: 'Мессенджеры не подключены: добавьте PROFITBOT_API_KEY в настройках Vercel.' });
+  const via = await provider();
+  if (via === 'profitbot' && !KEY) return res.status(500).json({ error: 'Мессенджеры не подключены: добавьте PROFITBOT_API_KEY в настройках Vercel.' });
+  if (via === 'brox' && !brox.configured()) return res.status(500).json({ error: 'Brox Connect не подключён: добавьте BROX_API_URL и BROX_API_KEY в настройках Vercel.' });
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const user = await caller(req);
   if (!user) return res.status(401).json({ error: 'Сессия истекла. Войдите заново.' });
@@ -32,6 +35,32 @@ module.exports = async (req, res) => {
   if (!to) return res.status(400).json({ error: 'У контакта нет телефона для ' + CHANNELS[channel] + '.' });
   const numbers = await ourNumbers();
   const known = normPhone(contact['instance_' + channel]);
+
+  if (via === 'brox') {
+    if (channel !== 'whatsapp') return res.status(400).json({ error: 'Через Brox Connect работает только WhatsApp.' });
+    let bx;
+    try {
+      const ch = await brox.pickChannel(numbers, known);
+      // Скрытый номер (…@lid) отправляем как есть, иначе — по телефону
+      const chatId = String(contact['chat_' + channel] || '');
+      const bxTo = /@lid$/.test(chatId) ? chatId : (normPhone(contact.phoneNorm || contact.phone) || digits(chatId.split('@')[0]));
+      if (!bxTo) return res.status(400).json({ error: 'У контакта нет телефона для WhatsApp.' });
+      const sent = await brox.send(ch.id, bxTo, text);
+      bx = { from: normPhone(ch.phone), msgId: sent.messageId, to: bxTo };
+      await putDoc('config', 'messaging_send', { ok: true, code: '', from: bx.from, at: new Date().toISOString(), provider: 'brox' }).catch(() => {});
+    } catch (e) {
+      if (e.code === 'instance_not_authorized' || e.code === 'instance_not_found') {
+        await putDoc('config', 'messaging_send', { ok: false, code: e.code, from: known || numbers[0] || '', at: new Date().toISOString(), provider: 'brox' }).catch(() => {});
+      }
+      return res.status(e instanceof brox.BroxError ? 400 : 500).json({ error: e instanceof brox.BroxError ? e.message : 'Сообщение не отправлено.' });
+    }
+    const doc = { deal: rows[0].id, contact: deal.contact, owner: deal.owner || '', channel, dir: 'out', text, type: 'text',
+      from: bx.from, chatId: bx.to, source: 'crm', by: user.id, msgId: bx.msgId, status: 'queued', at: new Date().toISOString() };
+    const id = 'c_out_' + String(bx.msgId).replace(/[^A-Za-z0-9_.~:@+-]/g, '');
+    await putDoc('chat', id, doc);
+    return res.json({ ok: true, id, data: doc });
+  }
+
   const from = (known && isOur(numbers, known) ? known : '') || numbers[0] || '';
   if (!from) return res.status(400).json({ error: 'Не задан номер для отправки: укажите его в «Настройки → Мессенджеры».' });
 

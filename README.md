@@ -6,6 +6,7 @@ CRM команды: воронки сделок в тенге, клиенты (�
 
 - `public/index.html` — само приложение, без сборки.
 - `api/config.js` — отдаёт странице адрес Supabase и публичный ключ.
+- `api/wa-send.js`, `api/wa-webhook.js`, `api/brox-webhook.js` — отправка и приём сообщений WhatsApp (`_inbox.js` — общая запись в сделки, `_brox.js` — клиент Brox Connect).
 - `api/admin.js` — кабинет администратора на сервере: создание сотрудников с почтой и паролем, смена пароля, закрытие доступа.
 - `supabase.sql` — схема базы и правила доступа (выполняется один раз в Supabase → SQL Editor).
 
@@ -18,6 +19,24 @@ CRM команды: воронки сделок в тенге, клиенты (�
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API Keys → `service_role` (секретный, никому не передавать) |
 
 После изменения переменных: Deployments → ⋯ → Redeploy.
+
+## Мессенджеры
+
+WhatsApp работает через один из двух сервисов. Выбор — в «Настройки → Мессенджеры».
+
+**ProfitBot** (WhatsApp, Telegram, MAX): `PROFITBOT_API_KEY`, `PROFITBOT_WEBHOOK_SECRET`.
+Вебхук принимает `api/wa-webhook.js` через пересылку `supabase/functions/wa-relay`.
+
+**Brox Connect** (свой сервис, номер подключается по QR-коду, только WhatsApp):
+
+| Имя | Где взять |
+|---|---|
+| `BROX_API_URL` | Адрес сервиса Brox Connect, например `https://connect.example.com` |
+| `BROX_API_KEY` | Кабинет Brox Connect → «Настройки» → API-ключ |
+| `BROX_WEBHOOK_SECRET` | Кабинет Brox Connect → «Настройки» → секрет webhook |
+
+В кабинете Brox Connect в поле «Webhook» укажите `https://<адрес сайта>/api/brox-webhook`.
+Номера и переписка в сделках общие для обоих сервисов, переключаться можно в любой момент.
 
 ## Первый вход
 
