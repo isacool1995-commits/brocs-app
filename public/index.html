@@ -1247,9 +1247,9 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
     '<div class="tags-row" id="dTags"></div>'+
     '<div id="stageBar"></div>'+
     '<form class="dform" id="dealForm">'+
+     '<label class="f">Ответственный<select class="inp" id="d-owner">'+memberOptions(d.owner,true)+'</select></label>'+
      '<label class="f">Воронка<select class="inp" id="d-pipe" data-a="pipe-sel">'+pipelines().filter(p=>pipeOk(p.id)||p.id===o.pipe).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===o.pipe?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
      '<div class="grid2"><label class="f">Бюджет, '+curSym()+'<input class="inp num" id="d-budget" type="number" min="0" step="1" value="'+esc(d.budget)+'" placeholder="0"></label><label class="f">Этап<select class="inp" id="d-stage" data-a="stage-sel">'+stOpts+'</select></label></div>'+
-     '<label class="f">Ответственный<select class="inp" id="d-owner">'+memberOptions(d.owner,true)+'</select></label>'+
      '<label class="f">Клиент (бренд)<select class="inp" id="d-company" data-a="sel-new" data-t="d-newco">'+coOpts+'</select></label>'+
      '<div id="d-newco" hidden><label class="f">Название бренда<input class="inp" id="d-nco-name"></label></div>'+
      '<label class="f">Контактное лицо<select class="inp" id="d-contact" data-a="sel-new" data-t="d-newc">'+cOpts+'</select></label>'+
