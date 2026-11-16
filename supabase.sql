@@ -263,3 +263,21 @@ create trigger docs_auto_reg before insert or update on public.docs
   for each row when (new.col = 'deals') execute function public.auto_reg_deal();
 
 select 'ok' as result;
+
+-- Теги сделки меняет только администратор. Изменение тегов от сотрудника база молча отбрасывает,
+-- остальные поля сделки сохраняются. Серверные функции (вебхук мессенджеров) работают без пользователя и не ограничены.
+create or replace function public.lock_deal_tags() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and not public.is_admin()
+     and coalesce(new.data->'tags', '[]'::jsonb) is distinct from coalesce(old.data->'tags', '[]'::jsonb) then
+    new.data := jsonb_set(new.data, '{tags}', coalesce(old.data->'tags', '[]'::jsonb));
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists docs_lock_tags on public.docs;
+create trigger docs_lock_tags before update on public.docs
+  for each row when (new.col = 'deals') execute function public.lock_deal_tags();
+
+select 'ok' as result;

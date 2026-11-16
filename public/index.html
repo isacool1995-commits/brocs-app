@@ -147,6 +147,21 @@ body.rail-min .df{left:80px;width:min(880px,calc(100vw - 96px))}
 .me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .content{padding-block:22px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px;min-width:0}
 .vh{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dh{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dh-sum{color:var(--muted);font-weight:600}
+.dh-r{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pipe-dd{position:relative}
+.pipe-dd>summary{list-style:none;display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 8px;margin-left:-8px;border-radius:8px;user-select:none}
+.pipe-dd>summary::-webkit-details-marker{display:none}
+.pipe-dd>summary:hover{background:var(--surface-2)}
+.pipe-dd h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.pipe-dd svg{width:18px;height:18px;color:var(--muted)}
+.pipe-pop{position:absolute;top:calc(100% + 6px);left:-8px;z-index:12;min-width:260px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.22);padding:6px}
+.pipe-pop button{display:flex;justify-content:space-between;gap:12px;width:100%;border:0;background:none;padding:9px 10px;border-radius:7px;font:inherit;font-weight:600;text-align:left;cursor:pointer;color:var(--fg)}
+.pipe-pop button:hover{background:var(--surface-2)}
+.pipe-pop button[aria-current="true"]{background:var(--accent-soft);color:var(--accent)}
+.pipe-pop button .num{color:var(--muted);font-weight:700}
+.pipe-pop hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
 .vh h1{font-size:22px;font-weight:800;letter-spacing:-.01em;margin-right:auto}
 .notice{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px;color:var(--muted)}
 .notice.warn{background:var(--warn-soft);border-color:transparent;color:var(--fg)}
@@ -211,24 +226,29 @@ label.f,div.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-wei
 /* Воронка */
 .boardwrap{overflow-x:auto;padding-bottom:6px;margin-inline:-4px}
 .board{display:flex;gap:12px;padding-inline:4px;align-items:flex-start;min-height:200px}
-.col{flex:0 0 276px;background:var(--surface-2);border-radius:var(--r);display:flex;flex-direction:column;max-height:calc(100vh - 260px);min-height:180px;border-top:4px solid var(--c)}
+.col{flex:0 0 272px;background:var(--surface-2);border-radius:10px;display:flex;flex-direction:column;height:calc(100vh - 178px);min-height:320px}
 .col.over{outline:2px dashed var(--accent);outline-offset:-2px}
-.col-h{padding:10px 12px 8px;display:flex;flex-direction:column;gap:2px}
-.col-h b{font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.col-h{padding:11px 12px 9px;display:flex;flex-direction:column;gap:3px;background:var(--surface);border-radius:10px 10px 0 0;border-bottom:3px solid var(--c);margin-bottom:8px}
+.col-h b{font-size:12.5px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .col-h span{font-size:12.5px;color:var(--muted)}
-.col-add{margin:0 10px 8px;height:32px;border:1px dashed var(--line);border-radius:8px;background:transparent;color:var(--muted);font-weight:700}
-.col-add:hover{border-color:var(--accent);color:var(--accent)}
+.col-add{margin:0 10px 8px;height:30px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-weight:600;font-size:12.5px;text-align:left;padding:0 6px;cursor:pointer}
+.col-add:hover{background:var(--surface);color:var(--accent)}
 .col-b{overflow-y:auto;padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 11px;display:flex;flex-direction:column;gap:6px;cursor:grab;box-shadow:var(--shadow)}
 .card:hover{border-color:var(--muted)}
 .card.drag{opacity:.45}
-.card .t{font-weight:700;overflow-wrap:anywhere}
+.card .ct{display:flex;align-items:baseline;gap:8px}
+.card .t{font-weight:700;overflow-wrap:anywhere;color:var(--accent)}
+.card .ct time{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .card .b{font-weight:800}
 .card .m{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card .f{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.card div.f{display:flex;flex-direction:row;align-items:center;gap:6px;flex-wrap:wrap;font-size:inherit;font-weight:inherit;color:inherit;letter-spacing:normal}
 .card .f .av{margin-left:auto}
-.dropbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.drop{border:2px dashed var(--line);border-radius:var(--r);padding:14px;text-align:center;font-weight:800;color:var(--muted)}
+/* Зоны закрытия появляются внизу экрана, только пока тащат карточку */
+.dropbar{position:fixed;left:236px;right:16px;bottom:14px;z-index:15;display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+body.dragging .dropbar{display:grid}
+body.rail-min .dropbar{left:80px}
+.drop{border:2px dashed var(--line);border-radius:var(--r);padding:20px 14px;text-align:center;font-weight:800;color:var(--muted);background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .drop.ok{color:var(--ok)} .drop.bad{color:var(--bad)} .drop.cold{color:#4F86C6}
 .drop.over{background:var(--surface);border-color:currentColor}
 @media (max-width:560px){.dropbar{grid-template-columns:1fr}}
@@ -423,6 +443,7 @@ table.perm select{font-weight:700;height:32px}
   .nav .cnt,.bell .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
   .bell{justify-content:center;padding:10px;width:auto}
   .bell .lbl,.rail-tgl{display:none}
+  .dropbar{left:72px}
   .ntf{left:64px;width:calc(100vw - 64px)}
   .ntf-pop{left:16px}
   .me span,.wa-st em{display:none}
@@ -974,8 +995,9 @@ function vDeals(){
   if(!vp.length) return '<div class="vh"><h1>Сделки</h1></div><div class="panel">'+emptyBox('Нет доступных воронок','Попросите руководителя открыть вам доступ к воронке.')+'</div>';
   const pid=(vp.find(p=>p.id===S.pipe)||vp[0]).id; S.pipe=pid;
   const deals=dfApply(vis('deals').filter(d=>dealPipe(d)===pid).filter(dealMatches)), conds=dfConds(dfGet());
-  let h='<div class="vh"><h1>Сделки</h1><div class="seg"><button data-a="deals-mode" data-v="board" aria-pressed="'+(S.dealsMode==='board')+'">Воронка</button><button data-a="deals-mode" data-v="list" aria-pressed="'+(S.dealsMode==='list')+'">Список</button></div><button class="btn primary" data-a="new-deal">+ Сделка</button></div>';
-  h+=pipeTabs(pid,true);
+  const shown=S.dealsMode==='board'?deals.filter(isOpen):deals;
+  let h='<div class="dh">'+pipeSwitch(pid)+'<span class="dh-sum num">'+shown.length+' '+plural(shown.length,'сделка','сделки','сделок')+': '+rub(shown.reduce((s,d)=>s+(+d.budget||0),0))+'</span>'+
+    '<div class="dh-r"><div class="seg" aria-label="Вид"><button data-a="deals-mode" data-v="board" aria-pressed="'+(S.dealsMode==='board')+'">▥ Воронка</button><button data-a="deals-mode" data-v="list" aria-pressed="'+(S.dealsMode==='list')+'">☰ Список</button></div><button class="btn primary" data-a="new-deal">+ Новая сделка</button></div></div>';
   const df=dfGet();
   if(df.preset!=='open'||S.q.trim()) h+='<div class="df-sum"><button type="button" class="pill ok" data-a="df-toggle" style="border:0;cursor:pointer">'+esc(dfLabel())+'</button>'+conds.map(c=>'<span class="pill">'+esc(c)+'</span>').join('')+
     (S.q.trim()?'<span class="pill">Поиск: '+esc(S.q.trim())+'</span>':'')+'<span class="num" style="color:var(--muted);font-weight:600">'+deals.length+' '+plural(deals.length,'сделка','сделки','сделок')+' · '+rub(deals.reduce((s,d)=>s+(+d.budget||0),0))+'</span><button type="button" class="btn sm ghost" data-a="df-clear">Сбросить</button></div>';
@@ -983,17 +1005,21 @@ function vDeals(){
     const open=deals.filter(isOpen);
     h+='<div class="boardwrap"><div class="board">'+stagesOf(pid).map(st=>{ const ds=open.filter(d=>d.stage===st.id).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
       const sum=ds.reduce((s,d)=>s+(+d.budget||0),0);
-      return '<section class="col" style="--c:'+st.color+'" data-drop="'+esc(st.id)+'"><div class="col-h"><b>'+esc(st.name)+'</b><span class="num">'+ds.length+' · '+rub(sum)+'</span></div><button class="col-add" data-a="new-deal" data-stage="'+esc(st.id)+'">+ Быстро добавить</button><div class="col-b">'+ds.map(card).join('')+'</div></section>' }).join('')+'</div></div>';
-    h+='<div class="dropbar"><div class="drop ok" data-drop="'+WON+'">Успешно реализовано</div><div class="drop bad" data-drop="'+LOST+'">Закрыто: отказ</div><div class="drop cold" data-drop="'+COLD+'">❄ Холодная</div><div class="drop" data-drop="__delete">Удалить сделку</div></div>';
-    h+='<p class="notice" style="margin:0">Перетащите карточку в другой этап или вниз, чтобы закрыть сделку. На телефоне этап меняется в карточке сделки.</p>';
+      return '<section class="col" style="--c:'+st.color+'" data-drop="'+esc(st.id)+'"><div class="col-h"><b title="'+esc(st.name)+'">'+esc(st.name)+'</b><span class="num">'+ds.length+' '+plural(ds.length,'сделка','сделки','сделок')+': '+rub(sum)+'</span></div><button class="col-add" data-a="new-deal" data-stage="'+esc(st.id)+'">+ Быстрое добавление</button><div class="col-b">'+ds.map(card).join('')+'</div></section>' }).join('')+'</div></div>';
+    h+='<div class="dropbar"><div class="drop ok" data-drop="'+WON+'">Успешно реализовано</div><div class="drop bad" data-drop="'+LOST+'">Закрыто: отказ</div><div class="drop cold" data-drop="'+COLD+'">❄ Холодная</div><div class="drop" data-drop="__delete">🗑 Удалить</div></div>';
   } else {
     h+=dealsList(deals,pid);
   }
   return h }
+// Название воронки в заголовке открывает список воронок, как в amoCRM.
+function pipeSwitch(pid){ const cur=pipeOf(pid);
+  return '<details class="pipe-dd"><summary title="Сменить воронку"><h1>'+esc(cur.name)+'</h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="pipe-pop" role="menu">'+
+    pipelines().filter(p=>pipeOk(p.id)).map(p=>'<button type="button" data-a="pipe-pick" data-v="'+esc(p.id)+'" aria-current="'+(p.id===pid)+'"><span>'+esc(p.name)+'</span><span class="num">'+vis('deals').filter(d=>dealPipe(d)===p.id&&isOpen(d)).length+'</span></button>').join('')+
+    (isBoss()?'<hr><button type="button" data-a="pipe-add">+ Новая воронка</button><button type="button" data-a="nav" data-v="setup">⚙ Настроить воронки</button>':'')+'</div></details>' }
 function pipeTabs(pid,counts){ return '<div class="pipes" role="tablist" aria-label="Воронки">'+pipelines().filter(p=>pipeOk(p.id)).map(p=>'<button role="tab" class="btn sm'+(p.id===pid?' primary':'')+'" aria-selected="'+(p.id===pid)+'" data-a="pipe-pick" data-v="'+esc(p.id)+'">'+esc(p.name)+(counts?' <span class="num" style="opacity:.7">'+vis('deals').filter(d=>dealPipe(d)===p.id&&isOpen(d)).length+'</span>':'')+'</button>').join('')+(isBoss()?'<button class="btn sm ghost" data-a="pipe-add">+ Воронка</button>':'')+'</div>' }
 function card(d){ const c=S.contacts[d.contact], co=S.companies[d.company], nt=nextTask(d.id);
   let due=''; if(nt){ const b=bucket(nt); due='<span class="pill '+(b==='overdue'?'bad':b==='today'?'warn':'')+'">'+esc(nt.due?fmtDate(nt.due):'Задача')+'</span>' } else due='<span class="pill warn">Нет задач</span>';
-  return '<article class="card" draggable="'+can('deals','edit',d)+'" data-id="'+esc(d.id)+'" data-a="open-deal" tabindex="0"><div class="t">'+esc(d.title)+'</div><div class="b num">'+rub(d.budget)+'</div>'+((c||co)?'<div class="m">'+esc([co&&co.name,co&&co.city,c&&c.name].filter(Boolean).join(' · '))+'</div>':'')+'<div class="f">'+(d.unread>0?'<span class="pill ok">💬 '+d.unread+'</span>':'')+due+(co&&co.pay?'<span class="tag">'+esc(co.pay)+'</span>':'')+(d.tags||[]).slice(0,3).map(t=>tagHtml(t)).join('')+((d.tags||[]).length>3?'<span class="tag-more">+'+(d.tags.length-3)+'</span>':'')+avatar(d.owner,'sm')+'</div></article>' }
+  return '<article class="card" draggable="'+can('deals','edit',d)+'" data-id="'+esc(d.id)+'" data-a="open-deal" tabindex="0"><div class="ct"><span class="t">'+esc(d.title)+'</span><time class="num">'+esc(fmtDate(d.createdAt))+'</time></div><div class="b num">'+rub(d.budget)+'</div>'+((c||co)?'<div class="m">'+esc([co&&co.name,co&&co.city,c&&c.name].filter(Boolean).join(' · '))+'</div>':'')+'<div class="f">'+(d.unread>0?'<span class="pill ok">💬 '+d.unread+'</span>':'')+due+(co&&co.pay?'<span class="tag">'+esc(co.pay)+'</span>':'')+(d.tags||[]).slice(0,3).map(t=>tagHtml(t)).join('')+((d.tags||[]).length>3?'<span class="tag-more">+'+(d.tags.length-3)+'</span>':'')+avatar(d.owner,'sm')+'</div></article>' }
 
 function vTasks(){
   let ts=vis('tasks').filter(t=>match(t.text,t.type,S.deals[t.deal]&&S.deals[t.deal].title));
@@ -1279,11 +1305,12 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
 // Теги сделки: у новой сделки копим в S.overlay.tags до создания, у существующей сохраняем сразу.
 function dealTags(){ const o=S.overlay; return o.isNew?(o.tags||[]):((S.deals[o.id]||{}).tags||[]) }
 function renderDealTags(force){ const box=$('#dTags'), o=S.overlay; if(!box||!o) return; if(!force&&document.activeElement&&document.activeElement.id==='tagInp') return;
-  const ed=o.isNew||can('deals','edit',S.deals[o.id]), tags=dealTags();
+  // Теги ставит и убирает только администратор; сотрудники их только видят.
+  const ed=isBoss()&&(o.isNew||can('deals','edit',S.deals[o.id])), tags=dealTags();
   box.innerHTML=tags.map(t=>tagHtml(t,ed?'<button type="button" data-a="tag-del" data-v="'+esc(t)+'" aria-label="Убрать тег '+esc(t)+'">×</button>':'')).join('')+
     (ed?'<input class="tag-inp" id="tagInp" list="tagList" maxlength="30" placeholder="#Добавить тег" aria-label="Добавить тег" autocomplete="off"><datalist id="tagList">'+allTags().filter(t=>!tags.some(x=>x.toLowerCase()===t.toLowerCase())).map(t=>'<option value="'+esc(t)+'">').join('')+'</datalist>'
       :(tags.length?'':'<span style="color:var(--muted);font-size:12.5px">Без тегов</span>')) }
-async function setDealTags(tags){ const o=S.overlay; tags=tags.slice(0,20);
+async function setDealTags(tags){ const o=S.overlay; if(!isBoss()){ toast('Теги меняет только администратор'); return false } tags=tags.slice(0,20);
   if(o.isNew){ o.tags=tags; renderDealTags(true); return true }
   const d=Object.assign({},S.deals[o.id],{tags,updatedAt:now()}); const ok=await put('deals',o.id,d); renderDealTags(true); return ok }
 async function addDealTag(raw){ let t=String(raw||'').replace(/^#+/,'').replace(/[,;]/g,' ').replace(/\s+/g,' ').trim().slice(0,30); if(!t) return;
@@ -1741,14 +1768,14 @@ document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa();
 document.addEventListener('change',e=>{ const ms=e.target.closest&&e.target.closest('.ms'); if(!ms||!e.target.dataset.cf) return;
   const vals=[...ms.querySelectorAll('input[data-cf]:checked')].map(x=>x.value), t=ms.querySelector('.ms-text');
   t.textContent=vals.length?vals.join(', '):'Не выбрано'; t.classList.toggle('ms-empty',!vals.length) });
-document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open],details.stg-dd[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
+document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open],details.stg-dd[open],details.pipe-dd[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
 document.addEventListener('toggle',e=>{ const d=e.target; if(d.classList&&d.classList.contains('ms')&&d.open){ const s=d.querySelector('.ms-search'); if(s) setTimeout(()=>s.focus(),0) } },true);
 let qT; $('#q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value; render(true) },150) });
 
 // перетаскивание карточек
 let dragId=null;
-document.addEventListener('dragstart',e=>{ const c=e.target.closest&&e.target.closest('.card'); if(!c) return; dragId=c.dataset.id; c.classList.add('drag'); try{ e.dataTransfer.setData('text/plain',dragId); e.dataTransfer.effectAllowed='move' }catch(_){} });
-document.addEventListener('dragend',e=>{ document.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over')); dragId=null });
+document.addEventListener('dragstart',e=>{ const c=e.target.closest&&e.target.closest('.card'); if(!c) return; dragId=c.dataset.id; c.classList.add('drag'); document.body.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain',dragId); e.dataTransfer.effectAllowed='move' }catch(_){} });
+document.addEventListener('dragend',e=>{ document.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over')); document.body.classList.remove('dragging'); dragId=null });
 document.addEventListener('dragover',e=>{ const z=e.target.closest&&e.target.closest('[data-drop]'); if(!z||!dragId) return; e.preventDefault(); document.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over') }); z.classList.add('over') });
 document.addEventListener('drop',e=>{ const z=e.target.closest&&e.target.closest('[data-drop]'); if(!z||!dragId) return; e.preventDefault(); const id=dragId, to=z.dataset.drop; z.classList.remove('over');
   if(to==='__delete'&&!can('deals','del',S.deals[id])) toast('Нет прав на удаление этой сделки');
