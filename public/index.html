@@ -130,6 +130,7 @@ label.f,div.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-wei
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.bad{background:var(--bad-soft);color:var(--bad)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.wa-st{text-decoration:none}.wa-st em{font-style:normal}
 .pill i{width:8px;height:8px;border-radius:50%;display:inline-block}
 .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
 
@@ -334,7 +335,7 @@ table.perm select{font-weight:700;height:32px}
   .nav a{justify-content:center;padding:10px;position:relative}
   .nav a span.lbl{display:none}
   .nav .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
-  .me span{display:none}
+  .me span,.wa-st em{display:none}
   .col{max-height:none}
 }
 @media (prefers-reduced-motion: no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
@@ -637,7 +638,7 @@ function render(force){
   $('#nav').innerHTML=VIEWS.filter(([k])=>av.includes(k)).map(([k,l])=>'<a href="#'+k+'" data-a="nav" data-v="'+k+'" title="'+l+'" aria-label="'+l+'"'+(S.view===k?' aria-current="page"':'')+'>'+icon(k)+'<span class="lbl">'+l+'</span>'+(k==='tasks'&&overdue?'<span class="cnt num">'+overdue+'</span>':'')+'</a>').join('');
   const n=team().length;
   $('#railfoot').innerHTML=(S.mode==='live'?'<span><i class="dot" style="background:var(--ok)"></i>Данные общие для команды</span>':S.mode==='local'?'<span><i class="dot" style="background:var(--warn)"></i>Пробный режим</span>':'<span><i class="dot" style="background:var(--muted)"></i>Подключение…</span>')+'<span>В команде: <b class="num">'+n+'</b></span>';
-  $('#me').innerHTML=S.me?avatar(S.me)+'<span>'+esc(memberName(S.me))+'</span>'+(sb?'<button class="btn sm ghost" data-a="logout">Выйти</button>':''):'';
+  $('#me').innerHTML=S.me?(S.mode==='live'?waBadge():'')+avatar(S.me)+'<span>'+esc(memberName(S.me))+'</span>'+(sb?'<button class="btn sm ghost" data-a="logout">Выйти</button>':''):'';
   const meM=S.members[S.me];
   if(S.mode==='live'&&(!meM||meM.blocked)){
     $('#nav').innerHTML=''; if(S.overlay) closeOverlay();
@@ -950,14 +951,21 @@ function drawMailBoxes(){ const boxes=S.boxes||[];
     '<button class="btn" data-a="close">Закрыть</button><button class="btn primary" data-a="mail-box-add">Проверить и подключить</button>') }
 // ---------- Настройки ----------
 const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность'],['messaging','Мессенджеры']];
-function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.config&&S.config.messaging_last)||null, hook='https://brocs-app.vercel.app/api/wa-webhook';
+// Связь с ProfitBot считаем рабочей, если от него пришло хотя бы одно событие (тест или сообщение).
+function waStatus(){ const last=S.config&&S.config.messaging_last;
+  if(!last||!last.at) return {cls:'bad',icon:'✕',text:'WhatsApp не подключён',hint:'От ProfitBot ещё не пришло ни одного события'};
+  const days=Math.floor((Date.now()-new Date(last.at))/864e5), when='Последнее событие от ProfitBot: '+fmtDate(last.at,true);
+  if(days>7) return {cls:'warn',icon:'!',text:'WhatsApp: тишина '+days+' дн.',hint:when};
+  return {cls:'ok',icon:'✓',text:'WhatsApp подключён',hint:when} }
+function waBadge(){ const s=waStatus(); return '<a class="pill '+s.cls+' wa-st" href="#settings" data-a="wa-status" title="'+esc(s.hint)+'" aria-label="'+esc(s.text+'. '+s.hint)+'"><b aria-hidden="true">'+s.icon+'</b><em>'+esc(s.text)+'</em></a>' }
+function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.config&&S.config.messaging_last)||null, hook='https://jlundeidupshqltjjrva.supabase.co/functions/v1/wa-relay';
   const evName={test:'тест из кабинета','message.incoming':'входящее сообщение','message.outgoing':'исходящее сообщение','message.status':'статус сообщения'};
   let h='<div class="vh"><h1>Мессенджеры</h1></div>';
   h+='<section class="panel"><header><h2>WhatsApp, Telegram, MAX через ProfitBot</h2></header><div class="set-grid">'+
     '<label class="set-row"><span>Номер для «Брокс»</span><input class="inp num" id="msg-numbers" data-a="msg-numbers" value="'+esc(m.numbers||'')+'" placeholder="77476754306"></label>'+
     '<div class="set-row"><span>Адрес вебхука</span><div class="crow"><code class="num" style="overflow-wrap:anywhere">'+esc(hook)+'</code><button type="button" class="btn sm" data-a="copy" data-v="'+esc(hook)+'">Копировать</button></div></div>'+
     '</div><p class="set-hint">«Брокс» принимает и отправляет сообщения только с этого номера. Сообщения других номеров вашего аккаунта ProfitBot, например подключённых к amoCRM, «Брокс» пропускает. Можно указать несколько номеров через запятую. Номер сохраняется, когда вы уходите из поля.</p></section>';
-  h+='<section class="panel"><header><h2>Связь с ProfitBot</h2></header><div class="permx" style="border-top:0">'+
+  h+='<section class="panel"><header><h2>Связь с ProfitBot</h2>'+waBadge()+'</header><div class="permx" style="border-top:0">'+
     (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>, '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
       :'<p class="notice warn" style="margin:0">От ProfitBot ещё не пришло ни одного события. Проверьте в кабинете ProfitBot → «API», что адрес вебхука сохранён, и нажмите там «Отправить тест».</p>')+
     '<span class="set-hint" style="margin:0">Страница обновляется сама, когда приходит событие.</span></div></section>';
@@ -1065,7 +1073,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
   const coOpts='<option value="">Клиент не выбран</option>'+vis('companies').sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru')).map(c=>'<option value="'+esc(c.id)+'"'+(d.company===c.id?' selected':'')+'>'+esc(c.name)+(c.city?' · '+esc(c.city):'')+'</option>').join('')+'<option value="__new">+ Новый клиент…</option>';
   const composer=o.isNew?'<div class="composer"><p style="margin:0;color:var(--muted)">Переписка, примечания и задачи появятся после создания сделки.</p></div>':
    '<div class="composer">'+
-    '<div class="ctabs" role="tablist"><button role="tab" data-a="ctab" data-v="wa" aria-selected="true">WhatsApp</button><button role="tab" data-a="ctab" data-v="note" aria-selected="false">Примечание</button><button role="tab" data-a="ctab" data-v="task" aria-selected="false">Задача</button>'+(allowedViews().includes('mail')?'<button type="button" data-a="deal-mail" title="Написать письмо клиенту">✉ Письмо</button>':'')+'</div>'+
+    '<div class="ctabs" role="tablist"><button role="tab" data-a="ctab" data-v="wa" aria-selected="true"><i class="dot" id="waDot"></i>WhatsApp</button><button role="tab" data-a="ctab" data-v="note" aria-selected="false">Примечание</button><button role="tab" data-a="ctab" data-v="task" aria-selected="false">Задача</button>'+(allowedViews().includes('mail')?'<button type="button" data-a="deal-mail" title="Написать письмо клиенту">✉ Письмо</button>':'')+'</div>'+
     '<div id="cp-wa" class="cpane"><div class="tpls">'+TEMPLATES.map((t,i)=>'<button type="button" data-a="tpl" data-i="'+i+'">'+esc(t[0])+'</button>').join('')+'</div>'+
      '<textarea class="inp" id="waText" rows="2" placeholder="Сообщение клиенту…"></textarea>'+
      '<div class="crow"><span class="waTo" id="waTo"></span><select class="inp" id="chatChannel" style="width:auto;height:30px" aria-label="Мессенджер">'+[['whatsapp','WhatsApp'],['telegram','Telegram'],['max','MAX']].map(([k,l])=>'<option value="'+k+'"'+(k===lastChannel(o.id)?' selected':'')+'>'+l+'</option>').join('')+'</select>'+
@@ -1086,6 +1094,7 @@ function drawDeal(){ const o=S.overlay; if(o.isNew&&!o.pipe) o.pipe=pipeOf(S.pip
      '<label class="f">Клиент (бренд)<select class="inp" id="d-company" data-a="sel-new" data-t="d-newco">'+coOpts+'</select></label>'+
      '<div id="d-newco" hidden><label class="f">Название бренда<input class="inp" id="d-nco-name"></label></div>'+
      '<label class="f">Контактное лицо<select class="inp" id="d-contact" data-a="sel-new" data-t="d-newc">'+cOpts+'</select></label>'+
+     '<label class="f" id="d-cph">Телефон контакта<input class="inp num" id="d-cphone" type="tel" value="'+esc((S.contacts[d.contact]||{}).phone||'')+'" placeholder="+7 7__ ___ __ __"></label>'+
      '<div id="d-newc" class="grid2" hidden><label class="f">Имя<input class="inp" id="d-nc-name"></label><label class="f">Телефон<input class="inp" id="d-nc-phone" type="tel" placeholder="+7 7__ ___ __ __"></label></div>'+
      '<label class="f">Теги через запятую<input class="inp" id="d-tags" value="'+esc((d.tags||[]).join(', '))+'" placeholder="опт, сайт"></label>'+
      fieldsBlock(d)+
@@ -1144,9 +1153,10 @@ function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return;
   if(forceBottom||atBottom) wrap.scrollTop=wrap.scrollHeight }
 
 function updateWa(){ const o=S.overlay; const a=$('#waSend'), to=$('#waTo'); if(!a||!o||o.isNew) return; const d=S.deals[o.id]; if(!d) return;
+  const ws=waStatus(), dot=$('#waDot'); if(dot){ dot.style.background='var(--'+ws.cls+')'; dot.title=ws.text+'. '+ws.hint }
   const ph=dealPhone(d), txt=($('#waText')||{}).value||'';
   a.href=ph?'https://wa.me/'+ph+(txt.trim()?'?text='+encodeURIComponent(txt.trim()):''):'#';
-  to.innerHTML=ph?'Кому: <b class="num">'+esc(fmtPhone(ph))+'</b> · '+esc(clientName(d)):'<span style="color:var(--warn)">Нет телефона. Добавьте его контакту или клиенту.</span>' }
+  to.innerHTML=ph?'Кому: <b class="num">'+esc(fmtPhone(ph))+'</b> · '+esc(clientName(d)):'<span style="color:var(--warn)">Нет телефона. Впишите его в поле «Телефон контакта» слева и сохраните.</span>' }
 async function logNote(kind,text,extra){ const id=S.overlay.id; const d=JSON.parse(JSON.stringify(S.deals[id]));
   d.notes=(d.notes||[]).concat([Object.assign({kind,by:S.me,at:now(),text:text.slice(0,4000)},extra||{})]).slice(-300); d.updatedAt=now();
   const ok=await put('deals',id,d); if(ok) renderDealLive(true); return ok }
@@ -1156,6 +1166,10 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
   let contact=$('#d-contact').value, company=$('#d-company').value;
   if(company==='__new'){ const nm=$('#d-nco-name').value.trim(); if(!nm){ toast('Введите название новой компании'); return } company=newId(); await put('companies',company,{name:nm,owner:$('#d-owner').value||S.me,createdAt:now()}) }
   if(contact==='__new'){ const nm=$('#d-nc-name').value.trim(); if(!nm){ toast('Введите имя нового контакта'); return } contact=newId(); await put('contacts',contact,{name:nm,phone:$('#d-nc-phone').value.trim(),phoneNorm:normPhone($('#d-nc-phone').value),company:company||'',owner:$('#d-owner').value,createdAt:now()}) }
+  else { const ph=$('#d-cphone').value.trim();
+    // Телефон из карточки сделки сохраняем в контакт. Если контакта нет, создаём его по названию бренда или сделки.
+    if(contact&&ph!==((S.contacts[contact]||{}).phone||'')){ if(!await put('contacts',contact,Object.assign({},S.contacts[contact],{phone:ph,phoneNorm:normPhone(ph)}))) return }
+    else if(!contact&&ph){ contact=newId(); await put('contacts',contact,{name:(S.companies[company]||{}).name||$('#d-nco-name').value.trim()||title,phone:ph,phoneNorm:normPhone(ph),company:company||'',owner:$('#d-owner').value,createdAt:now()}) } }
   const id=o.isNew?newId():o.id; const prev=o.isNew?null:S.deals[id];
   const d=Object.assign({},prev||{createdAt:now(),notes:[]},{title,pipeline:$('#d-pipe').value,budget:Math.max(0,Math.round(+$('#d-budget').value||0)),owner:$('#d-owner').value,contact,company,
     tags:$('#d-tags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,10),f:cf.values,updatedAt:now()});
@@ -1403,6 +1417,7 @@ const A={
     if(n){ toast('Сначала перенесите '+n+' '+plural(n,'сделку','сделки','сделок')+' из этого этапа'); return }
     if(stages().length<=1){ toast('В воронке должен остаться хотя бы один этап'); return }
     confirmBox('Удалить этап «'+stageOf(id).name+'»?','Удалить',()=>putStages(stages().filter(s=>s.id!==id))) },
+  'wa-status':(el,e)=>{ e.preventDefault(); const s=waStatus(); if(isBoss()){ S.setTab='messaging'; go('settings') } else toast(s.text+'. '+s.hint) },
   'confirm-no':()=>{ $('#confirmLayer').innerHTML='' },
   'confirm-yes':()=>{ const cb=confirmBox.cb; $('#confirmLayer').innerHTML=''; cb&&cb() }
 };
@@ -1414,7 +1429,8 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if($('#confirmLay
   if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('card')) A['open-deal'](e.target,e) });
 document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&el.dataset.a;
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
-  else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
+  else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new';
+    if(el.id==='d-contact'){ $('#d-cph').hidden=el.value==='__new'; $('#d-cphone').value=(S.contacts[el.value]||{}).phone||'' } }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
   else if(a==='msg-numbers'){ const v=el.value.split(/[,;\s]+/).map(normPhone).filter(Boolean).join(', '); el.value=v;
