@@ -227,9 +227,9 @@ label.f,div.f{display:flex;flex-direction:column;gap:5px;font-size:12px;font-wei
 .card .m{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .f{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .card .f .av{margin-left:auto}
-.dropbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dropbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .drop{border:2px dashed var(--line);border-radius:var(--r);padding:14px;text-align:center;font-weight:800;color:var(--muted)}
-.drop.ok{color:var(--ok)} .drop.bad{color:var(--bad)}
+.drop.ok{color:var(--ok)} .drop.bad{color:var(--bad)} .drop.cold{color:#4F86C6}
 .drop.over{background:var(--surface);border-color:currentColor}
 @media (max-width:560px){.dropbar{grid-template-columns:1fr}}
 
@@ -508,7 +508,7 @@ const DEFAULT_STAGES=[
   {id:'s_contract',name:'Договор и оплата',color:'#E0703A'}
 ];
 const PALETTE=['#5B7CE6','#2BA3C4','#1C9E7E','#7DB547','#D59A1F','#E0703A','#D2504B','#B865D6','#7A869A'];
-const WON='won', LOST='lost';
+const WON='won', LOST='lost', COLD='cold'; // COLD — папка «Холодная»: закрытые сделки, к которым можно вернуться
 const TASK_TYPES=['Звонок','Встреча','Письмо','Дело'];
 const COLS=['deals','contacts','companies','tasks','members','pipelines','depts','roles','config','mail','chat'];
 const FORMS=['ИП','ТОО','Другое'];
@@ -545,9 +545,9 @@ function stagesOf(pid){ const p=pipeOf(pid); return p.stages&&p.stages.length?p.
 const stages=()=>stagesOf(S.pipe);
 const dealPipe=d=>(d.pipeline&&pipelines().some(p=>p.id===d.pipeline))?d.pipeline:MAIN;
 function setPipe(id){ S.pipe=id; try{ localStorage.setItem('broks.pipe',id) }catch(e){} }
-function stageOf(id){ if(id===WON) return {id:WON,name:'Успешно',color:'var(--ok)'}; if(id===LOST) return {id:LOST,name:'Отказ',color:'var(--bad)'};
+function stageOf(id){ if(id===WON) return {id:WON,name:'Успешно',color:'var(--ok)'}; if(id===LOST) return {id:LOST,name:'Отказ',color:'var(--bad)'}; if(id===COLD) return {id:COLD,name:'Холодная',color:'#4F86C6'};
   for(const p of pipelines()){ const s=(p.stages&&p.stages.length?p.stages:DEFAULT_STAGES).find(s=>s.id===id); if(s) return s } return {id,name:'Без этапа',color:'#7A869A'} }
-function stageOptions(pid,cur){ return stagesOf(pid).map(s=>'<option value="'+esc(s.id)+'"'+(cur===s.id?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'<option value="'+WON+'"'+(cur===WON?' selected':'')+'>Успешно реализовано</option><option value="'+LOST+'"'+(cur===LOST?' selected':'')+'>Закрыто: отказ</option>' }
+function stageOptions(pid,cur){ return stagesOf(pid).map(s=>'<option value="'+esc(s.id)+'"'+(cur===s.id?' selected':'')+'>'+esc(s.name)+'</option>').join('')+'<option value="'+WON+'"'+(cur===WON?' selected':'')+'>Успешно реализовано</option><option value="'+LOST+'"'+(cur===LOST?' selected':'')+'>Закрыто: отказ</option><option value='+COLD+''+(cur===COLD?' selected':'')+'>Холодная</option>' }
 function departments(){ const ds=list('depts'); return ds.length?ds.sort((a,b)=>(a.order||0)-(b.order||0)||(a.name||'').localeCompare(b.name||'','ru')):DEFAULT_DEPTS.map((d,i)=>Object.assign({order:i},d)) }
 // ---------- права доступа ----------
 const ENT=[['deals','Сделки'],['contacts','Контактные лица'],['companies','Клиенты (бренды)'],['tasks','Задачи']];
@@ -577,7 +577,7 @@ async function ensureRoles(){ if(list('roles').length) return true; for(const r 
 function applyPerms(root){ if(!root) return; const m={'new-deal':'deals','new-task':'tasks','qt-add':'tasks','new-contact':'contacts','new-company':'companies'};
   Object.keys(m).forEach(a=>root.querySelectorAll('[data-a="'+a+'"]').forEach(b=>{ b.hidden=!can(m[a],'create') })) }
 async function ensureDepts(){ if(list('depts').length) return true; for(const [i,d] of DEFAULT_DEPTS.entries()){ if(!await put('depts',d.id,{name:d.name,order:i})) return false } return true }
-const isOpen=d=>d.stage!==WON&&d.stage!==LOST;
+const isOpen=d=>d.stage!==WON&&d.stage!==LOST&&d.stage!==COLD;
 const list=col=>Object.entries(S[col]).map(([id,v])=>Object.assign({id},v));
 
 function tzOpt(){ const tz=gen().tz; try{ new Intl.DateTimeFormat('ru-RU',{timeZone:tz}); return {timeZone:tz} }catch(e){ return {} } }
@@ -783,7 +783,9 @@ function drawFieldsEditor(){ const o=S.overlay; if(!o.list) o.list=JSON.parse(JS
 // ---------- Обязательные поля по этапам ----------
 const BUILTIN_REQ=[['budget','Бюджет'],['owner','Ответственный'],['contact','Контактное лицо'],['company','Клиент (бренд)']];
 function stageRules(){ return ((S.config&&S.config.stagerules)||{}).rules||{} }
-function reqKeys(pid,stage){ return ((stageRules()[pid]||{})[stage])||[] }
+function reqKeys(pid,stage){ const r=(stageRules()[pid]||{})[stage]; if(r) return r;
+  // В «Холодную» без правила по умолчанию требуем причину из поля «Холодные».
+  return stage===COLD&&dealFields().some(f=>f.id==='f_cold')?['f_cold']:[] }
 function reqLabel(k){ const b=BUILTIN_REQ.find(x=>x[0]===k); if(b) return b[1]; const f=dealFields().find(x=>x.id===k); return f?f.name:'' }
 const emptyVal=v=>v===''||v==null||v===false||(Array.isArray(v)&&!v.length);
 function missingFor(d,pid,stage){ return reqKeys(pid,stage).filter(k=>{
@@ -808,7 +810,7 @@ function drawReqFill(){ const o=S.overlay, d=S.deals[o.id]; if(!d){ closeOverlay
     (o.back?'<button class="btn" data-a="task-back">Назад к сделке</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="rq-save">Сохранить и перевести</button>') }
 function drawStageReq(){ const o=S.overlay; if(!o.rules) o.rules=JSON.parse(JSON.stringify(stageRules())); if(!o.pid) o.pid=pipeOf(S.pipe).id;
   const keys=BUILTIN_REQ.concat(dealFields().map(f=>[f.id,f.name]));
-  const stList=stagesOf(o.pid).concat([{id:WON,name:'Успешно реализовано'},{id:LOST,name:'Закрыто: отказ'}]);
+  const stList=stagesOf(o.pid).concat([{id:WON,name:'Успешно реализовано'},{id:LOST,name:'Закрыто: отказ'},{id:COLD,name:'Холодная'}]);
   const R=o.rules[o.pid]||{};
   modal('Обязательные поля по этапам',
     '<p class="set-hint" style="margin:0">Отметьте, какие поля должны быть заполнены, чтобы перевести сделку на этап. Если поле пустое, CRM остановит перенос, покажет уведомление и попросит заполнить поле. Бюджет считается заполненным, если он больше нуля.</p>'+
@@ -865,7 +867,7 @@ const hasTag=(d,t)=>(d.tags||[]).some(x=>String(x).toLowerCase()===String(t).toL
 const fieldText=v=>Array.isArray(v)?v.join(', '):v===true?'Да':v==null?'':String(v);
 function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields();
   let deals=all;
-  const stIdx=id=>{ const i=sts.findIndex(s=>s.id===id); return i<0?(id===WON?900:id===LOST?901:999):i };
+  const stIdx=id=>{ const i=sts.findIndex(s=>s.id===id); return i<0?(id===WON?900:id===LOST?901:id===COLD?902:999):i };
   const key={title:d=>(d.title||'').toLowerCase(),stage:d=>stIdx(d.stage),budget:d=>+d.budget||0,contact:d=>((S.contacts[d.contact]||{}).name||'').toLowerCase(),owner:d=>memberName(d.owner).toLowerCase(),createdAt:d=>d.createdAt||'',updatedAt:d=>d.updatedAt||''}[lf.sort]||(d=>fieldText((d.f||{})[lf.sort]).toLowerCase());
   deals=deals.slice().sort((a,b)=>{ const x=key(a), y=key(b); const r=x<y?-1:x>y?1:0; return lf.dir==='asc'?r:-r });
   const sum=deals.reduce((s,d)=>s+(+d.budget||0),0);
@@ -883,16 +885,16 @@ function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields(
   return h }
 // ---------- Фильтр сделок (кнопка в строке поиска, как в amoCRM) ----------
 // Слева готовые варианты, справа условия. Работает и в воронке, и в списке; выбор помним в этом браузере.
-const DF_PRESETS=[['open','Открытые сделки'],['mine','Мои сделки'],['won','Успешно реализованные'],['lost','Закрытые и нереализованные'],['notasks','Сделки без задач'],['overdue','Сделки с просроченными задачами'],['all','Все сделки']];
+const DF_PRESETS=[['open','Открытые сделки'],['mine','Мои сделки'],['won','Успешно реализованные'],['lost','Закрытые и нереализованные'],['cold','Холодные'],['notasks','Сделки без задач'],['overdue','Сделки с просроченными задачами'],['all','Все сделки']];
 const DF_PERIODS=[['all','За всё время'],['today','Сегодня'],['yesterday','Вчера'],['week','Последние 7 дней'],['month','Этот месяц'],['quarter','Этот квартал'],['custom','Свой период']];
 const DF_TASKS=[['','Любые'],['none','Без открытых задач'],['overdue','Просроченные'],['today','На сегодня'],['tomorrow','На завтра']];
 const dfBlank=p=>({preset:p||'',created:'all',cFrom:'',cTo:'',updated:'all',stages:[],owners:[],tasks:'',tags:[],bmin:'',bmax:'',f:{}});
-function dfPresetVals(p){ const f=dfBlank(p); if(p==='mine') f.owners=[S.me]; if(p==='won') f.stages=[WON]; if(p==='lost') f.stages=[LOST]; if(p==='notasks') f.tasks='none'; if(p==='overdue') f.tasks='overdue'; return f }
+function dfPresetVals(p){ const f=dfBlank(p); if(p==='mine') f.owners=[S.me]; if(p==='won') f.stages=[WON]; if(p==='lost') f.stages=[LOST]; if(p==='cold') f.stages=[COLD]; if(p==='notasks') f.tasks='none'; if(p==='overdue') f.tasks='overdue'; return f }
 function dfGet(){ if(!S.df){ let s={}; try{ s=JSON.parse(localStorage.getItem('broks.df')||'{}') }catch(e){} S.df=Object.assign(dfBlank('open'),s) } return S.df }
 function dfSet(f){ const same=f.preset?[f.preset]:DF_PRESETS.find(([k])=>JSON.stringify(Object.assign({},dfPresetVals(k),{preset:''}))===JSON.stringify(Object.assign({},f,{preset:''})));
   f.preset=same?same[0]:''; S.df=f; try{ localStorage.setItem('broks.df',JSON.stringify(f)) }catch(e){}
   // Закрытые сделки на доске не видны, поэтому для них сразу показываем список.
-  if(f.stages.length&&f.stages.every(s=>s===WON||s===LOST)) S.dealsMode='list' }
+  if(f.stages.length&&f.stages.every(s=>s===WON||s===LOST||s===COLD)) S.dealsMode='list' }
 function dfRange(kind,from,to){ if(kind==='today') return [dayStart(),null]; if(kind==='yesterday') return [dayStart(-1),dayStart()];
   if(kind==='week') return [dayStart(-6),null]; if(kind==='month'||kind==='quarter') return [periodFrom(kind),null];
   if(kind==='custom'){ const a=from?new Date(from+'T00:00:00'):null, b=to?new Date(to+'T00:00:00'):null; if(b) b.setDate(b.getDate()+1); return [a,b] } return [null,null] }
@@ -935,7 +937,7 @@ function dfDraw(){ const L=$('#dfLayer'); if(!S.dfOpen||S.view!=='deals'){ L.inn
    '<form class="df-form" id="dfForm">'+
     row('Создана','<div class="df-pair">'+per('df-created',f.created)+'<span class="df-pair" id="df-crange"'+(f.created==='custom'?'':' hidden')+'><input class="inp" type="date" id="df-cfrom" value="'+esc(f.cFrom)+'" aria-label="Создана с"> — <input class="inp" type="date" id="df-cto" value="'+esc(f.cTo)+'" aria-label="Создана по"></span></div>')+
     row('Изменена',per('df-updated',f.updated))+
-    row('Этапы','<div class="df-chips">'+sts.map(s=>chk('st',s.id,'<i class="dot" style="background:'+s.color+'"></i>'+esc(s.name),f.stages.includes(s.id))).join('')+chk('st',WON,'Успешно реализовано',f.stages.includes(WON))+chk('st',LOST,'Закрыто: отказ',f.stages.includes(LOST))+'</div>')+
+    row('Этапы','<div class="df-chips">'+sts.map(s=>chk('st',s.id,'<i class="dot" style="background:'+s.color+'"></i>'+esc(s.name),f.stages.includes(s.id))).join('')+chk('st',WON,'Успешно реализовано',f.stages.includes(WON))+chk('st',LOST,'Закрыто: отказ',f.stages.includes(LOST))+chk('st',COLD,'Холодная',f.stages.includes(COLD))+'</div>')+
     row('Ответственные','<div class="df-chips">'+chk('ow',S.me,'Я',f.owners.includes(S.me))+others.map(m=>chk('ow',m.id,esc(memberName(m.id)),f.owners.includes(m.id))).join('')+chk('ow','none','Без ответственного',f.owners.includes('none'))+'</div>')+
     row('Задачи','<select class="inp" id="df-tasks">'+DF_TASKS.map(([k,l])=>o(k,l,f.tasks)).join('')+'</select>')+
     (tags.length?row('Теги','<div class="df-chips">'+tags.map(t=>chk('tg',t,esc(t),f.tags.includes(t))).join('')+'</div>'):'')+
@@ -966,7 +968,7 @@ function vDeals(){
     h+='<div class="boardwrap"><div class="board">'+stagesOf(pid).map(st=>{ const ds=open.filter(d=>d.stage===st.id).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
       const sum=ds.reduce((s,d)=>s+(+d.budget||0),0);
       return '<section class="col" style="--c:'+st.color+'" data-drop="'+esc(st.id)+'"><div class="col-h"><b>'+esc(st.name)+'</b><span class="num">'+ds.length+' · '+rub(sum)+'</span></div><button class="col-add" data-a="new-deal" data-stage="'+esc(st.id)+'">+ Быстро добавить</button><div class="col-b">'+ds.map(card).join('')+'</div></section>' }).join('')+'</div></div>';
-    h+='<div class="dropbar"><div class="drop ok" data-drop="'+WON+'">Успешно реализовано</div><div class="drop bad" data-drop="'+LOST+'">Закрыто: отказ</div><div class="drop" data-drop="__delete">Удалить сделку</div></div>';
+    h+='<div class="dropbar"><div class="drop ok" data-drop="'+WON+'">Успешно реализовано</div><div class="drop bad" data-drop="'+LOST+'">Закрыто: отказ</div><div class="drop cold" data-drop="'+COLD+'">❄ Холодная</div><div class="drop" data-drop="__delete">Удалить сделку</div></div>';
     h+='<p class="notice" style="margin:0">Перетащите карточку в другой этап или вниз, чтобы закрыть сделку. На телефоне этап меняется в карточке сделки.</p>';
   } else {
     h+=dealsList(deals,pid);
@@ -1277,7 +1279,7 @@ function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return; const s
   const lbl=stageOf(cur);
   box.innerHTML='<div class="stagebar">'+st.map((s,i)=>{ const on=cur===WON||(idx>=0&&i<=idx); return '<button type="button" data-a="stage-pick" data-v="'+esc(s.id)+'" title="'+esc(s.name)+'" aria-label="Этап: '+esc(s.name)+'" style="background:'+(on?(cur===WON?'var(--ok)':lbl.color):'var(--surface-2)')+'"></button>' }).join('')+
    '<button type="button" data-a="stage-pick" data-v="'+WON+'" title="Успешно реализовано" aria-label="Этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
-   '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i>'+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+'</div>' }
+   '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i>'+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
 
 function normPhone(p){ let s=String(p||'').replace(/\D/g,''); if(s.length===11&&s[0]==='8') s='7'+s.slice(1); if(s.length===10) s='7'+s; return s.length>=10?s:'' }
 function lastChannel(dealId){ const cs=list('chat').filter(c=>c.deal===dealId).sort((a,b)=>(b.at||'').localeCompare(a.at||'')); return (cs[0]&&cs[0].channel)||'whatsapp' }
@@ -1349,13 +1351,13 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
   if(await put('deals',id,d)){ toast(o.isNew?'Сделка создана':'Сохранено'); if(o.isNew){ openOverlay({kind:'deal',id}) } else updateWa() } }
 function applyStage(d,stage,prev){ const old=prev?prev.stage:null; d.stage=stage;
   if(old!==stage){ d.notes=(d.notes||[]).concat([{sys:true,by:S.me,at:now(),text:old?'Этап: '+stageOf(old).name+' → '+stageOf(stage).name:'Сделка создана на этапе «'+stageOf(stage).name+'»'}]).slice(-200);
-    if(stage===WON||stage===LOST) d.closedAt=now(); else delete d.closedAt } }
+    if(stage===WON||stage===LOST||stage===COLD) d.closedAt=now(); else delete d.closedAt } }
 async function moveDeal(id,stage){ const prev=S.deals[id]; if(!prev||prev.stage===stage) return; if(!can('deals','edit',prev)){ toast('Нет прав на изменение этой сделки'); render(true); return }
   const miss=missingFor(prev,dealPipe(prev),stage);
   if(miss.length){ toast('Нельзя перевести на «'+stageOf(stage).name+'»: заполните '+miss.map(reqLabel).join(', ')); render(true);
     const back=S.overlay&&S.overlay.kind==='deal'?{kind:'deal',id}:null; openOverlay({kind:'reqfill',id,stage,miss,back}); return }
   const d=JSON.parse(JSON.stringify(prev)); d.updatedAt=now(); applyStage(d,stage,prev);
-  if(await put('deals',id,d)&&(stage===WON||stage===LOST)) toast(stage===WON?'Сделка закрыта успешно':'Сделка закрыта с отказом') }
+  if(await put('deals',id,d)&&(stage===WON||stage===LOST||stage===COLD)) toast(stage===WON?'Сделка закрыта успешно'+(dealPipe(d)===MAIN?' и передана в «Рег Отдел»':''):stage===COLD?'Сделка перенесена в холодные':'Сделка закрыта с отказом') }
 
 function drawTask(){ const o=S.overlay; const t=o.isNew?{text:'',type:'Звонок',due:(()=>{const d=new Date();d.setHours(d.getHours()+1,0,0,0);return d.toISOString()})(),owner:S.me,deal:o.deal||''}:S.tasks[o.id];
   if(!t){ closeOverlay(); return }

@@ -226,3 +226,40 @@ create policy docs_delete on public.docs for delete to authenticated using (
   case when col in ('members','pipelines','depts','roles','config','mail','chat') then public.is_admin()
        else public.can_do(col, 'del', data) end);
 
+-- Сделка из воронки Brocs, переведённая в «Успешно реализовано», сама появляется в «Рег Отдел» → «Неразобранное».
+-- Работает в базе, поэтому срабатывает при любом способе смены этапа. Повторно не создаёт: id новой сделки — reg_<id исходной>.
+create or replace function public.auto_reg_deal() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  st text; nid text; ts text := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+begin
+  if new.col <> 'deals' or coalesce(new.data->>'pipeline', 'main') <> 'main' or new.data->>'stage' <> 'won' then return new; end if;
+  if tg_op = 'UPDATE' and old.data->>'stage' = 'won' then return new; end if;
+  select coalesce(
+    (select s->>'id' from docs p, jsonb_array_elements(p.data->'stages') s
+      where p.col = 'pipelines' and p.id = 'p_reg' and lower(s->>'name') = 'неразобранное' limit 1),
+    (select p.data->'stages'->0->>'id' from docs p where p.col = 'pipelines' and p.id = 'p_reg')) into st;
+  if st is null then return new; end if;
+  nid := 'reg_' || new.id;
+  if not exists (select 1 from docs where col = 'deals' and id = nid) then
+    insert into docs (col, id, data) values ('deals', nid, jsonb_build_object(
+      'title', coalesce(new.data->>'title', 'Без названия'),
+      'budget', coalesce(new.data->'budget', '0'::jsonb),
+      'pipeline', 'p_reg', 'stage', st, 'owner', '',
+      'contact', coalesce(new.data->>'contact', ''), 'company', coalesce(new.data->>'company', ''),
+      'tags', coalesce(new.data->'tags', '[]'::jsonb), 'f', coalesce(new.data->'f', '{}'::jsonb),
+      'fromDeal', new.id, 'createdAt', ts, 'updatedAt', ts,
+      'notes', jsonb_build_array(jsonb_build_object('sys', true, 'by', '', 'at', ts,
+        'text', 'Сделка создана автоматически: «' || coalesce(new.data->>'title', '') || '» успешно реализована в воронке Brocs'))));
+    new.data := jsonb_set(new.data || jsonb_build_object('regDeal', nid), '{notes}',
+      coalesce(new.data->'notes', '[]'::jsonb) || jsonb_build_array(jsonb_build_object('sys', true, 'by', '', 'at', ts,
+        'text', 'Сделка передана в «Рег Отдел» → «Неразобранное»')));
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists docs_auto_reg on public.docs;
+create trigger docs_auto_reg before insert or update on public.docs
+  for each row when (new.col = 'deals') execute function public.auto_reg_deal();
+
+select 'ok' as result;
