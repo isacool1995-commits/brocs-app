@@ -114,6 +114,35 @@ body.rail-min .ntf-pop{left:80px}
 .search{flex:1;max-width:460px;position:relative}
 .search input{width:100%;height:38px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:0 12px 0 36px}
 .search svg{position:absolute;left:11px;top:11px;width:16px;height:16px;color:var(--muted)}
+.search:has(.df-btn:not([hidden])){max-width:620px}
+.df-btn{position:absolute;right:4px;top:4px;height:30px;max-width:60%;display:inline-flex;align-items:center;gap:6px;border:0;border-radius:6px;background:var(--accent-soft);color:var(--accent);font:inherit;font-size:12.5px;font-weight:700;padding:0 10px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.df-btn svg{position:static;width:14px;height:14px;color:currentColor;flex:none}
+.df-btn[aria-expanded="true"]{background:var(--accent);color:#fff}
+.df-scrim{position:fixed;inset:0;z-index:42}
+.df{position:fixed;top:62px;left:236px;width:min(880px,calc(100vw - 252px));max-height:calc(100vh - 78px);z-index:43;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.25);display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;overflow:hidden}
+body.rail-min .df{left:80px;width:min(880px,calc(100vw - 96px))}
+.df-pre{display:flex;flex-direction:column;gap:2px;padding:10px;border-right:1px solid var(--line);background:var(--surface-2);overflow-y:auto}
+.df-pre button{border:0;background:none;font:inherit;font-weight:600;text-align:left;padding:8px 10px;border-radius:7px;color:var(--fg);cursor:pointer}
+.df-pre button:hover{background:var(--surface)}
+.df-pre button[aria-current="true"]{background:var(--accent);color:#fff}
+.df-form{padding:12px 16px;overflow-y:auto;display:flex;flex-direction:column}
+.df-row{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
+.df-row:last-child{border-bottom:0}
+.df-row>span{font-weight:700;font-size:13px;color:var(--muted);padding-top:7px}
+.df-row .inp{height:34px}
+.df-row select.inp{max-width:320px}
+.df-pair{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.df-pair .inp{width:150px}
+.df-pair select.inp{width:auto;min-width:200px}
+.df-chips{display:flex;flex-wrap:wrap;gap:6px}
+.df-chk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;user-select:none}
+.df-chk:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.df-chk input{margin:0}
+.df-chk .dot{margin:0}
+.df-foot{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:var(--surface)}
+.df-cnt{margin-right:auto;color:var(--muted);font-weight:600}
+.df-sum{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-4px 0 10px}
+@media (max-width:820px){.df{left:8px;right:8px;width:auto;grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto}.df-pre{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}.df-pre button{white-space:nowrap}.df-row{grid-template-columns:1fr}.df-row>span{padding-top:0}}
 .me{margin-left:auto;display:flex;align-items:center;gap:8px;font-weight:600;min-width:0}
 .me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .content{padding-block:22px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px;min-width:0}
@@ -402,6 +431,7 @@ table.perm select{font-weight:700;height:32px}
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="q" type="search" placeholder="Поиск по сделкам, контактам, задачам" aria-label="Поиск" autocomplete="off">
+        <button type="button" class="df-btn" id="dfBtn" data-a="df-toggle" aria-expanded="false" hidden></button>
       </div>
       <div class="me" id="me"></div>
     </div>
@@ -449,6 +479,7 @@ table.perm select{font-weight:700;height:32px}
 <div id="confirmLayer"></div>
 <div id="toastLayer"></div>
 <div id="ntfLayer"></div>
+<div id="dfLayer"></div>
 <div id="ntfPop" class="ntf-pop" aria-live="polite"></div>
 
 <script>
@@ -701,7 +732,8 @@ function render(force){
   html+=({home:vHome,deals:vDeals,tasks:vTasks,contacts:vContacts,reports:vReports,team:vTeam,setup:vSetup,settings:vSettings,mail:vMail}[S.view])();
   main.innerHTML=html; applyPerms(main);
   if(S.overlay&&S.overlay.kind==='deal'&&!S.overlay.isNew){ renderDealLive(); updateWa() }
-  renderBell(); if(S.ntfOpen) drawNtf()
+  renderBell(); if(S.ntfOpen) drawNtf();
+  renderDfBtn(); if(S.dfOpen&&S.view!=='deals') dfToggle(false)
 }
 document.addEventListener('focusout',()=>{ setTimeout(()=>{ if(pendingRender) render() },0) });
 
@@ -831,30 +863,16 @@ function allTags(){ const m=new Map(); vis('deals').forEach(d=>(d.tags||[]).forE
   return [...m.values()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'ru')).map(e=>e[0]) }
 const hasTag=(d,t)=>(d.tags||[]).some(x=>String(x).toLowerCase()===String(t).toLowerCase());
 const fieldText=v=>Array.isArray(v)?v.join(', '):v===true?'Да':v==null?'':String(v);
-function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields(), optFields=fs.filter(f=>HAS_OPTS(f.type));
-  if(!['open','all','won','lost'].includes(lf.stage)&&!sts.some(s=>s.id===lf.stage)) lf.stage='open';
+function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields();
   let deals=all;
-  if(lf.stage==='open') deals=deals.filter(isOpen); else if(lf.stage==='won') deals=deals.filter(d=>d.stage===WON); else if(lf.stage==='lost') deals=deals.filter(d=>d.stage===LOST); else if(lf.stage!=='all') deals=deals.filter(d=>d.stage===lf.stage);
-  const from=periodFrom(lf.period); if(from) deals=deals.filter(d=>d.createdAt&&new Date(d.createdAt)>=from);
-  const tags=allTags(); if(lf.tag) deals=deals.filter(d=>hasTag(d,lf.tag));
-  const ff=fs.find(f=>f.id===lf.field);
-  if(ff&&lf.fval){ deals=deals.filter(d=>{ const v=(d.f||{})[ff.id]; if(lf.fval==='__empty') return emptyVal(v); return Array.isArray(v)?v.includes(lf.fval):v===lf.fval }) }
   const stIdx=id=>{ const i=sts.findIndex(s=>s.id===id); return i<0?(id===WON?900:id===LOST?901:999):i };
   const key={title:d=>(d.title||'').toLowerCase(),stage:d=>stIdx(d.stage),budget:d=>+d.budget||0,contact:d=>((S.contacts[d.contact]||{}).name||'').toLowerCase(),owner:d=>memberName(d.owner).toLowerCase(),createdAt:d=>d.createdAt||'',updatedAt:d=>d.updatedAt||''}[lf.sort]||(d=>fieldText((d.f||{})[lf.sort]).toLowerCase());
   deals=deals.slice().sort((a,b)=>{ const x=key(a), y=key(b); const r=x<y?-1:x>y?1:0; return lf.dir==='asc'?r:-r });
   const sum=deals.reduce((s,d)=>s+(+d.budget||0),0);
-  const sel=(k,opts,v,label)=>'<label class="lf-item"><span>'+label+'</span><select class="inp" id="lf-'+k+'" data-a="lf" data-k="'+k+'">'+opts+'</select></label>';
-  const o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(l)+'</option>';
   let h='<div class="lf-bar">'+
-    sel('stage',o('open','В работе (все этапы)',lf.stage)+o('all','Все сделки',lf.stage)+'<optgroup label="Этап">'+sts.map(s=>o(s.id,s.name,lf.stage)).join('')+'</optgroup>'+o('won','Успешно реализовано',lf.stage)+o('lost','Закрыто: отказ',lf.stage),lf.stage,'Этап')+
-    sel('period',o('all','За всё время',lf.period)+o('today','Сегодня',lf.period)+o('week','7 дней',lf.period)+o('month','Этот месяц',lf.period)+o('quarter','Этот квартал',lf.period),lf.period,'Создана')+
-    (tags.length||lf.tag?sel('tag',o('','любой',lf.tag)+(lf.tag&&!tags.includes(lf.tag)?o(lf.tag,lf.tag,lf.tag):'')+tags.map(t=>o(t,t,lf.tag)).join(''),lf.tag,'Тег'):'')+
-    (optFields.length?sel('field',o('','— не выбрано —',lf.field)+optFields.map(f=>o(f.id,f.name,lf.field)).join(''),lf.field,'Поле')+
-      (ff?sel('fval',o('','любое значение',lf.fval)+o('__empty','не заполнено',lf.fval)+(ff.options||[]).map(x=>o(x,x,lf.fval)).join(''),lf.fval,'Значение'):''):'')+
     (fs.length?'<details class="lf-cols"><summary class="btn sm">Колонки'+(lf.cols.length?' · '+lf.cols.length:'')+'</summary><div class="lf-pop">'+fs.map((f,i)=>'<label class="chk-l"><input type="checkbox" id="lfc-'+i+'" data-a="lf-col" value="'+esc(f.id)+'"'+(lf.cols.includes(f.id)?' checked':'')+'> '+esc(f.name)+'</label>').join('')+'</div></details>':'')+
-    ((lf.stage!=='open'||lf.period!=='all'||lf.fval||lf.tag)?'<button class="btn sm ghost" data-a="lf-reset">Сбросить</button>':'')+
     '<span class="lf-sum num">'+deals.length+' '+plural(deals.length,'сделка','сделки','сделок')+' · '+rub(sum)+'</span></div>';
-  if(!deals.length) return h+'<div class="panel">'+emptyBox('Сделок не найдено',S.q||lf.fval||lf.tag||lf.period!=='all'?'Измените фильтры или поиск.':'Добавьте сделку кнопкой «+ Сделка».')+'</div>';
+  if(!deals.length) return h+'<div class="panel">'+emptyBox('Сделок не найдено',S.q||dfGet().preset!=='open'?'Измените фильтры или поиск.':'Добавьте сделку кнопкой «+ Сделка».')+'</div>';
   const cols=[['title','Сделка'],['stage','Этап'],['budget','Бюджет','r'],['contact','Контакт'],['owner','Ответственный'],['createdAt','Создана'],['updatedAt','Обновлена']].concat(lf.cols.map(id=>{ const f=fs.find(x=>x.id===id); return f?[f.id,f.name]:null }).filter(Boolean));
   const th=c=>'<th class="'+(c[2]||'')+' lf-th" data-a="lf-sort" data-k="'+esc(c[0])+'">'+esc(c[1])+(lf.sort===c[0]?(lf.dir==='asc'?' ↑':' ↓'):'')+'</th>';
   h+='<div class="tablewrap"><table class="lf-table"><thead><tr>'+cols.map(th).join('')+'</tr></thead><tbody>'+deals.map(d=>{ const st=stageOf(d.stage), c=S.contacts[d.contact], co=S.companies[d.company];
@@ -863,17 +881,86 @@ function dealsList(all,pid){ const lf=lfGet(), sts=stagesOf(pid), fs=dealFields(
       '<td class="num">'+esc(fmtDate(d.createdAt))+'</td><td class="num">'+esc(fmtDate(d.updatedAt))+'</td>'+
       lf.cols.map(id=>fs.some(f=>f.id===id)?'<td>'+esc(fieldText((d.f||{})[id])||'—')+'</td>':'').join('')+'</tr>' }).join('')+'</tbody></table></div>';
   return h }
+// ---------- Фильтр сделок (кнопка в строке поиска, как в amoCRM) ----------
+// Слева готовые варианты, справа условия. Работает и в воронке, и в списке; выбор помним в этом браузере.
+const DF_PRESETS=[['open','Открытые сделки'],['mine','Мои сделки'],['won','Успешно реализованные'],['lost','Закрытые и нереализованные'],['notasks','Сделки без задач'],['overdue','Сделки с просроченными задачами'],['all','Все сделки']];
+const DF_PERIODS=[['all','За всё время'],['today','Сегодня'],['yesterday','Вчера'],['week','Последние 7 дней'],['month','Этот месяц'],['quarter','Этот квартал'],['custom','Свой период']];
+const DF_TASKS=[['','Любые'],['none','Без открытых задач'],['overdue','Просроченные'],['today','На сегодня'],['tomorrow','На завтра']];
+const dfBlank=p=>({preset:p||'',created:'all',cFrom:'',cTo:'',updated:'all',stages:[],owners:[],tasks:'',tags:[],bmin:'',bmax:'',f:{}});
+function dfPresetVals(p){ const f=dfBlank(p); if(p==='mine') f.owners=[S.me]; if(p==='won') f.stages=[WON]; if(p==='lost') f.stages=[LOST]; if(p==='notasks') f.tasks='none'; if(p==='overdue') f.tasks='overdue'; return f }
+function dfGet(){ if(!S.df){ let s={}; try{ s=JSON.parse(localStorage.getItem('broks.df')||'{}') }catch(e){} S.df=Object.assign(dfBlank('open'),s) } return S.df }
+function dfSet(f){ const same=f.preset?[f.preset]:DF_PRESETS.find(([k])=>JSON.stringify(Object.assign({},dfPresetVals(k),{preset:''}))===JSON.stringify(Object.assign({},f,{preset:''})));
+  f.preset=same?same[0]:''; S.df=f; try{ localStorage.setItem('broks.df',JSON.stringify(f)) }catch(e){}
+  // Закрытые сделки на доске не видны, поэтому для них сразу показываем список.
+  if(f.stages.length&&f.stages.every(s=>s===WON||s===LOST)) S.dealsMode='list' }
+function dfRange(kind,from,to){ if(kind==='today') return [dayStart(),null]; if(kind==='yesterday') return [dayStart(-1),dayStart()];
+  if(kind==='week') return [dayStart(-6),null]; if(kind==='month'||kind==='quarter') return [periodFrom(kind),null];
+  if(kind==='custom'){ const a=from?new Date(from+'T00:00:00'):null, b=to?new Date(to+'T00:00:00'):null; if(b) b.setDate(b.getDate()+1); return [a,b] } return [null,null] }
+function dfApply(deals,f){ f=f||dfGet();
+  if(f.stages.length) deals=deals.filter(d=>f.stages.includes(d.stage)); else if(f.preset!=='all') deals=deals.filter(isOpen);
+  const inR=(iso,r)=>{ if(!r[0]&&!r[1]) return true; if(!iso) return false; const t=new Date(iso); return (!r[0]||t>=r[0])&&(!r[1]||t<r[1]) };
+  const rc=dfRange(f.created,f.cFrom,f.cTo), ru=dfRange(f.updated); deals=deals.filter(d=>inR(d.createdAt,rc)&&inR(d.updatedAt,ru));
+  if(f.owners.length) deals=deals.filter(d=>f.owners.includes(d.owner||'none'));
+  if(f.tasks){ const by={}; vis('tasks').forEach(t=>{ if(!t.done&&t.deal) (by[t.deal]=by[t.deal]||[]).push(t) });
+    deals=deals.filter(d=>{ const ts=by[d.id]||[]; return f.tasks==='none'?!ts.length:ts.some(t=>bucket(t)===f.tasks) }) }
+  if(f.tags.length) deals=deals.filter(d=>f.tags.some(t=>hasTag(d,t)));
+  if(f.bmin!=='') deals=deals.filter(d=>(+d.budget||0)>=+f.bmin); if(f.bmax!=='') deals=deals.filter(d=>(+d.budget||0)<=+f.bmax);
+  Object.entries(f.f||{}).forEach(([id,v])=>{ if(v) deals=deals.filter(d=>{ const x=(d.f||{})[id]; return v==='__empty'?emptyVal(x):Array.isArray(x)?x.includes(v):x===v }) });
+  return deals }
+function dfConds(f){ const n=[]; const per=k=>(DF_PERIODS.find(p=>p[0]===k)||[])[1];
+  if(f.created!=='all') n.push('Создана: '+(f.created==='custom'?[f.cFrom,f.cTo].filter(Boolean).join(' — '):per(f.created)));
+  if(f.updated!=='all') n.push('Изменена: '+per(f.updated));
+  if(f.stages.length) n.push('Этапы: '+f.stages.map(s=>stageOf(s).name).join(', '));
+  if(f.owners.length) n.push('Ответственные: '+f.owners.map(o=>o==='none'?'без ответственного':o===S.me?'я':memberName(o)).join(', '));
+  if(f.tasks) n.push('Задачи: '+(DF_TASKS.find(t=>t[0]===f.tasks)||[])[1].toLowerCase());
+  if(f.tags.length) n.push('Теги: '+f.tags.join(', '));
+  if(f.bmin!==''||f.bmax!=='') n.push('Бюджет: '+[f.bmin!==''?'от '+rub(f.bmin):'',f.bmax!==''?'до '+rub(f.bmax):''].filter(Boolean).join(' '));
+  Object.entries(f.f||{}).forEach(([id,v])=>{ const fl=dealFields().find(x=>x.id===id); if(v&&fl) n.push(fl.name+': '+(v==='__empty'?'не заполнено':v)) });
+  return n }
+function dfLabel(){ const f=dfGet(); if(f.preset) return DF_PRESETS.find(p=>p[0]===f.preset)[1]; const n=dfConds(f).length; return 'Фильтр · '+n+' '+plural(n,'условие','условия','условий') }
+function renderDfBtn(){ const b=$('#dfBtn'), q=$('#q'); if(!b) return; const on=S.view==='deals'&&!!S.me; b.hidden=!on;
+  if(on){ b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5Z"/></svg><span style="overflow:hidden;text-overflow:ellipsis">'+esc(dfLabel())+'</span>';
+    b.title='Фильтр сделок: '+(dfConds(dfGet()).join('; ')||dfLabel()); b.setAttribute('aria-expanded',String(!!S.dfOpen)) }
+  q.placeholder=on?'Поиск и фильтр сделок':'Поиск по сделкам, контактам, задачам';
+  q.style.paddingRight=on?(b.offsetWidth+12)+'px':'' }
+function dfDraw(){ const L=$('#dfLayer'); if(!S.dfOpen||S.view!=='deals'){ L.innerHTML=''; S.dfOpen=false; return }
+  const f=S.dfDraft||dfGet(), sts=stagesOf(S.pipe), fs=dealFields().filter(x=>HAS_OPTS(x.type)), tags=allTags();
+  const o=(v,l,cur)=>'<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(l)+'</option>';
+  const row=(l,c)=>'<div class="df-row"><span>'+l+'</span><div>'+c+'</div></div>';
+  const chk=(name,v,l,on)=>'<label class="df-chk"><input type="checkbox" name="'+name+'" value="'+esc(v)+'"'+(on?' checked':'')+'>'+l+'</label>';
+  const per=(id,cur)=>'<select class="inp" id="'+id+'">'+DF_PERIODS.map(([k,l])=>o(k,l,cur)).join('')+'</select>';
+  const others=team().filter(m=>m.id!==S.me).sort((a,b)=>memberName(a.id).localeCompare(memberName(b.id),'ru'));
+  $('#dfLayer').innerHTML='<div class="df-scrim" data-a="df-close"></div><div class="df" role="dialog" aria-label="Фильтр сделок">'+
+   '<nav class="df-pre" aria-label="Готовые фильтры">'+DF_PRESETS.map(([k,l])=>'<button type="button" data-a="df-preset" data-v="'+k+'" aria-current="'+(f.preset===k)+'">'+esc(l)+'</button>').join('')+'</nav>'+
+   '<form class="df-form" id="dfForm">'+
+    row('Создана','<div class="df-pair">'+per('df-created',f.created)+'<span class="df-pair" id="df-crange"'+(f.created==='custom'?'':' hidden')+'><input class="inp" type="date" id="df-cfrom" value="'+esc(f.cFrom)+'" aria-label="Создана с"> — <input class="inp" type="date" id="df-cto" value="'+esc(f.cTo)+'" aria-label="Создана по"></span></div>')+
+    row('Изменена',per('df-updated',f.updated))+
+    row('Этапы','<div class="df-chips">'+sts.map(s=>chk('st',s.id,'<i class="dot" style="background:'+s.color+'"></i>'+esc(s.name),f.stages.includes(s.id))).join('')+chk('st',WON,'Успешно реализовано',f.stages.includes(WON))+chk('st',LOST,'Закрыто: отказ',f.stages.includes(LOST))+'</div>')+
+    row('Ответственные','<div class="df-chips">'+chk('ow',S.me,'Я',f.owners.includes(S.me))+others.map(m=>chk('ow',m.id,esc(memberName(m.id)),f.owners.includes(m.id))).join('')+chk('ow','none','Без ответственного',f.owners.includes('none'))+'</div>')+
+    row('Задачи','<select class="inp" id="df-tasks">'+DF_TASKS.map(([k,l])=>o(k,l,f.tasks)).join('')+'</select>')+
+    (tags.length?row('Теги','<div class="df-chips">'+tags.map(t=>chk('tg',t,esc(t),f.tags.includes(t))).join('')+'</div>'):'')+
+    row('Бюджет, '+curSym(),'<div class="df-pair"><input class="inp num" type="number" min="0" id="df-bmin" value="'+esc(f.bmin)+'" placeholder="от" aria-label="Бюджет от"> — <input class="inp num" type="number" min="0" id="df-bmax" value="'+esc(f.bmax)+'" placeholder="до" aria-label="Бюджет до"></div>')+
+    fs.map(x=>row(esc(x.name),'<select class="inp" data-df-field="'+esc(x.id)+'">'+o('','Любое',(f.f||{})[x.id]||'')+o('__empty','Не заполнено',(f.f||{})[x.id]||'')+(x.options||[]).map(v=>o(v,v,(f.f||{})[x.id]||'')).join('')+'</select>')).join('')+
+   '</form><footer class="df-foot"><span class="df-cnt num" id="dfCnt"></span><button type="button" class="btn" data-a="df-reset">Сбросить</button><button type="button" class="btn primary" data-a="df-apply">Применить</button></footer></div>';
+  dfCount() }
+function dfRead(){ const F=$('#dfForm'); if(!F) return dfGet(); const val=id=>($('#'+id)||{}).value||'';
+  const ch=n=>[...F.querySelectorAll('input[name="'+n+'"]:checked')].map(i=>i.value);
+  const f=dfBlank(''); f.created=val('df-created')||'all'; if(f.created==='custom'){ f.cFrom=val('df-cfrom'); f.cTo=val('df-cto') }
+  f.updated=val('df-updated')||'all'; f.stages=ch('st'); f.owners=ch('ow'); f.tasks=val('df-tasks'); f.tags=ch('tg');
+  f.bmin=val('df-bmin'); f.bmax=val('df-bmax'); F.querySelectorAll('[data-df-field]').forEach(s=>{ if(s.value) f.f[s.dataset.dfField]=s.value }); return f }
+function dfCount(){ const c=$('#dfCnt'); if(!c) return; const n=dfApply(vis('deals').filter(d=>dealPipe(d)===S.pipe).filter(dealMatches),dfRead()).length;
+  c.textContent='Найдено: '+n+' '+plural(n,'сделка','сделки','сделок') }
+function dfToggle(open){ S.dfOpen=open; S.dfDraft=null; dfDraw(); renderDfBtn() }
 function vDeals(){
   const vp=pipelines().filter(p=>pipeOk(p.id));
   if(!vp.length) return '<div class="vh"><h1>Сделки</h1></div><div class="panel">'+emptyBox('Нет доступных воронок','Попросите руководителя открыть вам доступ к воронке.')+'</div>';
   const pid=(vp.find(p=>p.id===S.pipe)||vp[0]).id; S.pipe=pid;
-  let deals=vis('deals').filter(d=>dealPipe(d)===pid).filter(dealMatches);
-  if(S.dealsOwner==='mine') deals=deals.filter(d=>d.owner===S.me);
-  else if(S.dealsOwner.indexOf('dept:')===0){ const dp=S.dealsOwner.slice(5); deals=deals.filter(d=>S.members[d.owner]&&S.members[d.owner].dept===dp) }
-  else if(S.dealsOwner!=='all') deals=deals.filter(d=>d.owner===S.dealsOwner);
-  const ownerSel='<select class="inp" id="dealsOwner" data-a="deals-owner" style="width:auto" aria-label="Ответственный"><option value="all"'+(S.dealsOwner==='all'?' selected':'')+'>Все сотрудники</option><option value="mine"'+(S.dealsOwner==='mine'?' selected':'')+'>Только мои</option><optgroup label="Отделы">'+departments().map(d=>'<option value="dept:'+esc(d.id)+'"'+(S.dealsOwner==='dept:'+d.id?' selected':'')+'>'+esc(d.name)+'</option>').join('')+'</optgroup><optgroup label="Сотрудники">'+team().map(m=>'<option value="'+esc(m.id)+'"'+(S.dealsOwner===m.id?' selected':'')+'>'+esc(memberName(m.id))+'</option>').join('')+'</optgroup></select>';
-  let h='<div class="vh"><h1>Сделки</h1><div class="seg"><button data-a="deals-mode" data-v="board" aria-pressed="'+(S.dealsMode==='board')+'">Воронка</button><button data-a="deals-mode" data-v="list" aria-pressed="'+(S.dealsMode==='list')+'">Список</button></div>'+ownerSel+'<button class="btn primary" data-a="new-deal">+ Сделка</button></div>';
+  const deals=dfApply(vis('deals').filter(d=>dealPipe(d)===pid).filter(dealMatches)), conds=dfConds(dfGet());
+  let h='<div class="vh"><h1>Сделки</h1><div class="seg"><button data-a="deals-mode" data-v="board" aria-pressed="'+(S.dealsMode==='board')+'">Воронка</button><button data-a="deals-mode" data-v="list" aria-pressed="'+(S.dealsMode==='list')+'">Список</button></div><button class="btn primary" data-a="new-deal">+ Сделка</button></div>';
   h+=pipeTabs(pid,true);
+  const df=dfGet();
+  if(df.preset!=='open'||S.q.trim()) h+='<div class="df-sum"><button type="button" class="pill ok" data-a="df-toggle" style="border:0;cursor:pointer">'+esc(dfLabel())+'</button>'+conds.map(c=>'<span class="pill">'+esc(c)+'</span>').join('')+
+    (S.q.trim()?'<span class="pill">Поиск: '+esc(S.q.trim())+'</span>':'')+'<span class="num" style="color:var(--muted);font-weight:600">'+deals.length+' '+plural(deals.length,'сделка','сделки','сделок')+' · '+rub(deals.reduce((s,d)=>s+(+d.budget||0),0))+'</span><button type="button" class="btn sm ghost" data-a="df-clear">Сбросить</button></div>';
   if(S.dealsMode==='board'){
     const open=deals.filter(isOpen);
     h+='<div class="boardwrap"><div class="board">'+stagesOf(pid).map(st=>{ const ds=open.filter(d=>d.stage===st.id).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
@@ -1555,6 +1642,12 @@ const A={
     if(n){ toast('Сначала перенесите '+n+' '+plural(n,'сделку','сделки','сделок')+' из этого этапа'); return }
     if(stages().length<=1){ toast('В воронке должен остаться хотя бы один этап'); return }
     confirmBox('Удалить этап «'+stageOf(id).name+'»?','Удалить',()=>putStages(stages().filter(s=>s.id!==id))) },
+  'df-toggle':()=>dfToggle(!S.dfOpen),
+  'df-close':()=>dfToggle(false),
+  'df-preset':el=>{ dfSet(dfPresetVals(el.dataset.v)); dfToggle(false); render(true) },
+  'df-apply':()=>{ dfSet(dfRead()); dfToggle(false); render(true) },
+  'df-reset':()=>{ S.dfDraft=dfPresetVals('open'); dfDraw() },
+  'df-clear':()=>{ dfSet(dfPresetVals('open')); S.q=''; $('#q').value=''; render(true) },
   'rail-toggle':()=>setRailMin(!document.body.classList.contains('rail-min'),true),
   'ntf-toggle':()=>ntfToggle(!S.ntfOpen),
   'ntf-close':()=>ntfToggle(false),
@@ -1570,12 +1663,13 @@ function moveStage(id,dir){ const st=stages().slice(); const i=st.findIndex(s=>s
 
 document.addEventListener('click',e=>{ const el=e.target.closest('[data-a]'); if(!el) return; const a=el.dataset.a;
   if(el.tagName==='SELECT'||el.tagName==='INPUT') return; if(A[a]) A[a](el,e) });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(S.ntfOpen) ntfToggle(false); else if($('#confirmLayer').innerHTML) $('#confirmLayer').innerHTML=''; else if(S.overlay) backOrClose() }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ if(S.dfOpen) dfToggle(false); else if(S.ntfOpen) ntfToggle(false); else if($('#confirmLayer').innerHTML) $('#confirmLayer').innerHTML=''; else if(S.overlay) backOrClose() }
   if(e.key==='Enter'&&e.target.classList&&e.target.classList.contains('card')) A['open-deal'](e.target,e);
   if(e.target.id==='tagInp'){
     if(e.key==='Enter'||e.key===','){ e.preventDefault(); addDealTag(e.target.value) }
     else if(e.key==='Backspace'&&!e.target.value){ const t=dealTags(); if(t.length) setDealTags(t.slice(0,-1)) } } });
 document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&el.dataset.a;
+  if(el.closest&&el.closest('#dfForm')){ if(el.id==='df-created') $('#df-crange').hidden=el.value!=='custom'; dfCount(); return }
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new';
     if(el.id==='d-contact'){ $('#d-cph').hidden=el.value==='__new'; $('#d-cphone').value=(S.contacts[el.value]||{}).phone||'' } }
@@ -1608,6 +1702,7 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='stage-name'){ const v=el.value.trim(); if(!v){ el.value=stageOf(el.dataset.id).name; return } putStages(stages().map(s=>s.id===el.dataset.id?Object.assign({},s,{name:v.slice(0,60)}):s)) } });
 document.addEventListener('submit',e=>{ if(e.target.id==='dealForm'){ e.preventDefault(); saveDeal() } });
 document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa();
+  if(e.target.id==='df-bmin'||e.target.id==='df-bmax') dfCount();
   // Выбор из подсказки списка тегов приходит как замена текста: сразу добавляем тег.
   if(e.target.id==='tagInp'&&(e.inputType==='insertReplacementText'||!e.inputType)&&allTags().includes(e.target.value)) addDealTag(e.target.value);
   if(e.target.classList&&e.target.classList.contains('ms-search')){ const q=e.target.value.trim().toLowerCase(), box=e.target.closest('.ms');
