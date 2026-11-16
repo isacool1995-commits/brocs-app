@@ -790,9 +790,9 @@ function drawFieldsEditor(){ const o=S.overlay; if(!o.list) o.list=JSON.parse(JS
 // ---------- Обязательные поля по этапам ----------
 const BUILTIN_REQ=[['budget','Бюджет'],['owner','Ответственный'],['contact','Контактное лицо'],['company','Клиент (бренд)']];
 function stageRules(){ return ((S.config&&S.config.stagerules)||{}).rules||{} }
-function reqKeys(pid,stage){ const r=(stageRules()[pid]||{})[stage]; if(r) return r;
-  // В «Холодную» без правила по умолчанию требуем причину из поля «Холодные».
-  return stage===COLD&&dealFields().some(f=>f.id==='f_cold')?['f_cold']:[] }
+function reqKeys(pid,stage){ return (stageRules()[pid]||{})[stage]||defReq(stage) }
+// Без своего правила при отказе требуем «Причину отказа», в «Холодную» — причину из поля «Холодные».
+function defReq(stage){ const def={[LOST]:'f_lost',[COLD]:'f_cold'}[stage]; return def&&dealFields().some(f=>f.id===def)?[def]:[] }
 function reqLabel(k){ const b=BUILTIN_REQ.find(x=>x[0]===k); if(b) return b[1]; const f=dealFields().find(x=>x.id===k); return f?f.name:'' }
 const emptyVal=v=>v===''||v==null||v===false||(Array.isArray(v)&&!v.length);
 function missingFor(d,pid,stage){ return reqKeys(pid,stage).filter(k=>{
@@ -822,7 +822,7 @@ function drawStageReq(){ const o=S.overlay; if(!o.rules) o.rules=JSON.parse(JSON
   modal('Обязательные поля по этапам',
     '<p class="set-hint" style="margin:0">Отметьте, какие поля должны быть заполнены, чтобы перевести сделку на этап. Если поле пустое, CRM остановит перенос, покажет уведомление и попросит заполнить поле. Бюджет считается заполненным, если он больше нуля.</p>'+
     '<label class="f">Воронка<select class="inp" id="sr-pipe" data-a="sr-pipe">'+pipelines().map(p=>'<option value="'+esc(p.id)+'"'+(p.id===o.pid?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></label>'+
-    stList.map(s=>{ const on=R[s.id]||[];
+    stList.map(s=>{ const on=R[s.id]||defReq(s.id);
       return '<details class="fe-row sr-stage"'+(o.openStage===s.id?' open':'')+'><summary><b>'+esc(s.name)+'</b> <span class="sr-sum" id="sr-sum-'+esc(s.id)+'">'+(on.length?esc(on.map(reqLabel).filter(Boolean).join(', ')):'нет обязательных')+'</span></summary><div class="chips">'+
         keys.map(([k,l],i)=>'<label class="chk-l"><input type="checkbox" id="sr-'+esc(s.id)+'-'+i+'" data-a="sr-toggle" data-s="'+esc(s.id)+'" value="'+esc(k)+'"'+(on.includes(k)?' checked':'')+'> '+esc(l)+'</label>').join('')+'</div></details>' }).join(''),
     (o.back?'<button class="btn" data-a="task-back">Назад</button>':'<button class="btn" data-a="close">Отмена</button>')+'<button class="btn primary" data-a="sr-save">Сохранить</button>') }
@@ -1690,7 +1690,7 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='lf'){ const lf=lfGet(), k=el.dataset.k; lf[k]=el.value; if(k==='field') lf.fval=''; lfSave(); el.blur(); render(true) }
   else if(a==='lf-col'){ const lf=lfGet(), v=el.value; lf.cols=lf.cols.filter(x=>x!==v); if(el.checked) lf.cols.push(v); lfSave(); S.lfColsOpen=true; render(true); const dd=$('.lf-cols'); if(dd) dd.open=true }
   else if(a==='sr-pipe'){ S.overlay.pid=el.value; S.overlay.openStage=null; drawStageReq() }
-  else if(a==='sr-toggle'){ const o=S.overlay, s=el.dataset.s, k=el.value; o.rules[o.pid]=o.rules[o.pid]||{}; const cur=(o.rules[o.pid][s]||[]).filter(x=>x!==k);
+  else if(a==='sr-toggle'){ const o=S.overlay, s=el.dataset.s, k=el.value; o.rules[o.pid]=o.rules[o.pid]||{}; const cur=(o.rules[o.pid][s]||defReq(s)).filter(x=>x!==k);
     if(el.checked) cur.push(k); if(cur.length) o.rules[o.pid][s]=cur; else delete o.rules[o.pid][s];
     const sum=$('#sr-sum-'+CSS.escape(s)); if(sum) sum.textContent=cur.length?cur.map(reqLabel).filter(Boolean).join(', '):'нет обязательных' }
   else if(a==='mb-email'){ const p=mailPreset(el.value); if(p){ $('#mb-imap').value=p[2]; $('#mb-imap-port').value=p[3]; $('#mb-smtp').value=p[4]; $('#mb-smtp-port').value=p[5]; $('#mb-hint').textContent='Это '+p[1]+'. Пароль для приложений создаётся здесь: '+p[6]+'.' } }
