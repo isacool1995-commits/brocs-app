@@ -314,6 +314,15 @@ td.r,th.r{text-align:right}
 .stagebar button[data-tip]:hover::after,.stagebar button[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#16222E;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;padding:6px 10px;border-radius:7px;white-space:pre;z-index:8;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .stagebar button.tip-l:hover::after,.stagebar button.tip-l:focus-visible::after{left:0;transform:none}
 .stagebar button.tip-r:hover::after,.stagebar button.tip-r:focus-visible::after{left:auto;right:0;transform:none}
+.stg-dd{position:relative}
+.stg-dd>summary{list-style:none;cursor:pointer;user-select:none}
+.stg-dd>summary::-webkit-details-marker{display:none}
+.stg-dd>summary:hover{filter:brightness(.95);box-shadow:0 0 0 1px var(--line)}
+.stg-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:9;width:290px;max-height:min(420px,60vh);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.22);padding:6px}
+.stg-pop h4{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:8px 8px 4px}
+.stg-pop button{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:7px 8px;border-radius:6px;font:inherit;font-size:13.5px;text-align:left;cursor:pointer;color:var(--fg)}
+.stg-pop button:hover{background:var(--surface-2)}
+.stg-pop button[aria-current="true"]{background:var(--accent-soft);font-weight:700}
 .stagelbl{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
 .dform{display:flex;flex-direction:column;gap:12px}
 .fk{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
@@ -1282,12 +1291,18 @@ async function addDealTag(raw){ let t=String(raw||'').replace(/^#+/,'').replace(
   const cur=dealTags(); if(cur.some(x=>x.toLowerCase()===t.toLowerCase())){ renderDealTags(true); return }
   if(cur.length>=20){ toast('У сделки может быть не больше 20 тегов'); return }
   await setDealTags(cur.concat([t])); const i=$('#tagInp'); if(i) i.focus() }
+// Метка этапа открывает список всех воронок и этапов, как в amoCRM: выбранный этап применяется сразу.
+function stageMenu(cur,pname,lbl){ const o=S.overlay||{}, pid=o.pipe||S.pipe;
+  const item=(p,s,name,color)=>'<button type="button" data-a="stage-go" data-p="'+esc(p)+'" data-v="'+esc(s)+'" aria-current="'+(p===pid&&s===cur)+'"><i class="dot" style="background:'+color+'"></i>'+esc(name)+'</button>';
+  return '<details class="stg-dd"><summary class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'" title="Выбрать воронку и этап"><i style="background:'+lbl.color+'"></i><span style="opacity:.65;font-weight:600">'+esc(pname)+' ·</span> '+esc(lbl.name)+' <span aria-hidden="true">▾</span></summary>'+
+    '<div class="stg-pop" role="menu">'+pipelines().filter(p=>pipeOk(p.id)||p.id===pid).map(p=>'<h4>'+esc(p.name)+'</h4>'+stagesOf(p.id).map(s=>item(p.id,s.id,s.name,s.color)).join('')).join('')+
+    '<h4>Закрыть</h4>'+item(pid,WON,'Успешно реализовано','var(--ok)')+item(pid,LOST,'Закрыто: отказ','var(--bad)')+item(pid,COLD,'Холодная','#4F86C6')+'</div></details>' }
 function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return; const st=stagesOf((S.overlay&&S.overlay.pipe)||S.pipe); const idx=st.findIndex(s=>s.id===cur);
   const lbl=stageOf(cur), pname=pipeOf((S.overlay&&S.overlay.pipe)||S.pipe).name, n=st.length+1;
   const tip=(i,name)=>' data-tip="'+esc(pname+'\n'+(i+1)+'. '+name+(i<idx?' ✓':''))+'" class="'+(i<n/4?'tip-l':i>=n*3/4?'tip-r':'')+'"';
   box.innerHTML='<div class="stagebar">'+st.map((s,i)=>{ const on=cur===WON||(idx>=0&&i<=idx); return '<button type="button" data-a="stage-pick" data-v="'+esc(s.id)+'"'+tip(i,s.name+(s.id===cur?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: '+esc(s.name)+'" style="background:'+(on?(cur===WON?'var(--ok)':lbl.color):'var(--surface-2)')+'"></button>' }).join('')+
    '<button type="button" data-a="stage-pick" data-v="'+WON+'"'+tip(st.length,'Успешно реализовано'+(cur===WON?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
-   '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i><span style="opacity:.65;font-weight:600">'+esc(pname)+' ·</span> '+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
+   '<div class="stagelbl">'+stageMenu(cur,pname,lbl)+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
 
 function normPhone(p){ let s=String(p||'').replace(/\D/g,''); if(s.length===11&&s[0]==='8') s='7'+s.slice(1); if(s.length===10) s='7'+s; return s.length>=10?s:'' }
 function lastChannel(dealId){ const cs=list('chat').filter(c=>c.deal===dealId).sort((a,b)=>(b.at||'').localeCompare(a.at||'')); return (cs[0]&&cs[0].channel)||'whatsapp' }
@@ -1297,7 +1312,7 @@ async function apiChat(payload){ const {data:{session}}=await sb.auth.getSession
 function renderDealLive(forceBottom){ const o=S.overlay; if(!o||o.isNew) return; const d=S.deals[o.id]; if(!d) return;
   if(d.unread>0&&can('deals','edit',d)&&!o.unreadCleared){ o.unreadCleared=true; put('deals',o.id,Object.assign({},d,{unread:0})) }
   renderDealTags();
-  if(o.pipe===dealPipe(d)){ renderStageBar(d.stage); const sel=$('#d-stage'); if(sel&&document.activeElement!==sel) sel.value=d.stage }
+  if(o.pipe===dealPipe(d)){ if(!document.querySelector('.stg-dd[open]')) renderStageBar(d.stage); const sel=$('#d-stage'); if(sel&&document.activeElement!==sel) sel.value=d.stage }
   const co=S.companies[d.company], ph=dealPhone(d);
   const fld=(k,v)=>'<div style="min-width:0"><div class="fk">'+k+'</div><div style="font-weight:700;overflow-wrap:anywhere">'+(v?esc(v):'<span style="color:var(--warn)">не заполнено</span>')+'</div></div>';
   const cb=$('#clientBox'); if(cb) cb.innerHTML=co?'<section class="panel"><header><h2>Клиент: '+esc(co.name)+'</h2><button class="btn sm" data-a="open-company" data-id="'+esc(d.company)+'">Изменить</button></header><div class="grid2" style="padding:12px 16px;gap:12px 16px">'+fld('Город',co.city)+fld('ИП или ТОО',co.form)+fld('Налоговый режим',co.tax)+fld('БИН / ИИН',co.bin)+fld('Кто оплачивает',co.payer)+fld('Способ оплаты',co.pay)+fld('WhatsApp',ph?fmtPhone(ph):'')+'</div></section>'
@@ -1360,11 +1375,12 @@ async function saveDeal(){ const o=S.overlay; const title=$('#d-title').value.tr
 function applyStage(d,stage,prev){ const old=prev?prev.stage:null; d.stage=stage;
   if(old!==stage){ d.notes=(d.notes||[]).concat([{sys:true,by:S.me,at:now(),text:old?'Этап: '+stageOf(old).name+' → '+stageOf(stage).name:'Сделка создана на этапе «'+stageOf(stage).name+'»'}]).slice(-200);
     if(stage===WON||stage===LOST||stage===COLD) d.closedAt=now(); else delete d.closedAt } }
-async function moveDeal(id,stage){ const prev=S.deals[id]; if(!prev||prev.stage===stage) return; if(!can('deals','edit',prev)){ toast('Нет прав на изменение этой сделки'); render(true); return }
-  const miss=missingFor(prev,dealPipe(prev),stage);
+async function moveDeal(id,stage,pid){ const prev=S.deals[id]; if(!prev) return; pid=pid||dealPipe(prev); if(prev.stage===stage&&dealPipe(prev)===pid) return; if(!can('deals','edit',prev)){ toast('Нет прав на изменение этой сделки'); render(true); return }
+  const miss=missingFor(prev,pid,stage);
   if(miss.length){ toast('Нельзя перевести на «'+stageOf(stage).name+'»: заполните '+miss.map(reqLabel).join(', ')); render(true);
-    const back=S.overlay&&S.overlay.kind==='deal'?{kind:'deal',id}:null; openOverlay({kind:'reqfill',id,stage,miss,back}); return }
-  const d=JSON.parse(JSON.stringify(prev)); d.updatedAt=now(); applyStage(d,stage,prev);
+    const back=S.overlay&&S.overlay.kind==='deal'?{kind:'deal',id}:null; openOverlay({kind:'reqfill',id,stage,pid,miss,back}); return }
+  const d=JSON.parse(JSON.stringify(prev)); d.updatedAt=now(); const movedPipe=dealPipe(prev)!==pid; if(movedPipe) d.pipeline=pid; applyStage(d,stage,prev);
+  if(movedPipe&&!(stage===WON||stage===LOST||stage===COLD)){ if(await put('deals',id,d)){ toast('Сделка переведена: '+pipeOf(pid).name+' → '+stageOf(stage).name); if(S.overlay&&S.overlay.kind==='deal'&&S.overlay.id===id) openOverlay({kind:'deal',id}) } return }
   if(await put('deals',id,d)&&(stage===WON||stage===LOST||stage===COLD)) toast(stage===WON?'Сделка закрыта успешно'+(dealPipe(d)===MAIN?' и передана в «Рег Отдел»':''):stage===COLD?'Сделка перенесена в холодные':'Сделка закрыта с отказом') }
 
 function drawTask(){ const o=S.overlay; const t=o.isNew?{text:'',type:'Звонок',due:(()=>{const d=new Date();d.setHours(d.getHours()+1,0,0,0);return d.toISOString()})(),owner:S.me,deal:o.deal||''}:S.tasks[o.id];
@@ -1528,6 +1544,8 @@ const A={
   'qt-add':async()=>{ const text=$('#qt-text').value.trim(); if(!text){ toast('Опишите задачу'); $('#qt-text').focus(); return } const v=$('#qt-due').value;
     const ok=await put('tasks',newId(),{text,type:$('#qt-type').value,due:v?new Date(v).toISOString():'',owner:$('#qt-owner').value,deal:S.overlay.id,done:false,createdAt:now(),by:S.me});
     if(ok){ $('#qt-text').value=''; toast('Задача поставлена'); renderDealLive(true) } },
+  'stage-go':el=>{ const o=S.overlay, p=el.dataset.p, v=el.dataset.v; const dd=el.closest('details'); if(dd) dd.open=false;
+    if(o.isNew){ o.pipe=p; const ps=$('#d-pipe'); if(ps) ps.value=p; const s=$('#d-stage'); s.innerHTML=stageOptions(p,v); s.value=v; renderStageBar(v) } else moveDeal(o.id,v,p) },
   'stage-pick':el=>{ const o=S.overlay; const v=el.dataset.v; $('#d-stage').value=v; if(o.isNew||o.pipe!==dealPipe(S.deals[o.id])) renderStageBar(v); else moveDeal(o.id,v) },
   'pipe-pick':el=>{ setPipe(el.dataset.v); render(true) },
   'pipe-add':async()=>{ if(!isBoss()) return; const id='p_'+newId(); const ord=Math.max(0,...pipelines().map(p=>p.order||0))+1;
@@ -1615,7 +1633,8 @@ const A={
     o.miss.forEach(k=>{ if(k==='budget') d.budget=Math.max(0,Math.round(+(($('#rq-budget')||{}).value)||0));
       else if(k==='owner'||k==='contact'||k==='company') d[k]=($('#rq-'+k)||{}).value||'';
       else { const f=dealFields().find(x=>x.id===k); if(f){ const v=readField(f); if(emptyVal(v)) delete d.f[k]; else d.f[k]=v } } });
-    const still=missingFor(d,dealPipe(d),o.stage); if(still.length){ toast('Ещё не заполнено: '+still.map(reqLabel).join(', ')); return }
+    if(o.pid&&o.pid!==dealPipe(d)) d.pipeline=o.pid;
+    const still=missingFor(d,o.pid||dealPipe(d),o.stage); if(still.length){ toast('Ещё не заполнено: '+still.map(reqLabel).join(', ')); return }
     d.updatedAt=now(); applyStage(d,o.stage,prev);
     if(await put('deals',o.id,d)){ toast('Сделка переведена на «'+stageOf(o.stage).name+'»'); backOrClose() } },
   'fe-save':async()=>{ feCollect(); const L=S.overlay.list;
@@ -1683,7 +1702,7 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   if(a==='deals-owner'){ S.dealsOwner=el.value; el.blur(); render(true) }
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new';
     if(el.id==='d-contact'){ $('#d-cph').hidden=el.value==='__new'; $('#d-cphone').value=(S.contacts[el.value]||{}).phone||'' } }
-  else if(a==='stage-sel'){ renderStageBar(el.value) }
+  else if(a==='stage-sel'){ const o=S.overlay; renderStageBar(el.value); if(o&&o.kind==='deal'&&!o.isNew) moveDeal(o.id,el.value,$('#d-pipe').value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
   else if(a==='msg-numbers'){ const v=el.value.split(/[,;\s]+/).map(normPhone).filter(Boolean).join(', '); el.value=v;
     saveConfig('messaging',{numbers:v}).then(ok=>{ if(ok) toast(v?'Номер сохранён':'Номер очищен') }) }
@@ -1702,7 +1721,8 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
     if(on&&!s.ips.length&&S.myIp&&/[.:]/.test(S.myIp)) patch.ips=[S.myIp];
     saveConfig('security',patch).then(ok=>{ if(ok) toast(on?(patch.ips?'Белый список включён, ваш IP добавлен':'Белый список включён'):'Белый список выключен') }) }
   else if(a==='pipe-sel'){ const o=S.overlay; o.pipe=el.value; const d=o.isNew?null:S.deals[o.id]; const cur=d&&dealPipe(d)===el.value?d.stage:stagesOf(el.value)[0].id;
-    const s=$('#d-stage'); s.innerHTML=stageOptions(el.value,cur); s.value=cur; renderStageBar(cur) }
+    const s=$('#d-stage'); s.innerHTML=stageOptions(el.value,cur); s.value=cur; renderStageBar(cur);
+    if(d&&dealPipe(d)!==el.value) moveDeal(o.id,cur,el.value) }
   else if(a==='pipe-name'){ const v=el.value.trim(); const p=pipeOf(S.pipe); if(!v){ el.value=p.name; return } savePipe(p,{name:v.slice(0,60)}) }
   else if(a==='perm'){ const e2=el.dataset.e, k=el.dataset.k, v=el.value; el.className='inp lv-'+v; saveRole(S.roleSel,r=>{ r.perms=r.perms||{}; r.perms[e2]=r.perms[e2]||{}; r.perms[e2][k]=v }) }
   else if(a==='role-name'){ const v=el.value.trim(); if(!v){ el.value=(roles().find(x=>x.id===S.roleSel)||{}).name||''; return } saveRole(S.roleSel,r=>{ r.name=v.slice(0,40) }) }
@@ -1721,7 +1741,7 @@ document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa();
 document.addEventListener('change',e=>{ const ms=e.target.closest&&e.target.closest('.ms'); if(!ms||!e.target.dataset.cf) return;
   const vals=[...ms.querySelectorAll('input[data-cf]:checked')].map(x=>x.value), t=ms.querySelector('.ms-text');
   t.textContent=vals.length?vals.join(', '):'Не выбрано'; t.classList.toggle('ms-empty',!vals.length) });
-document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
+document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open],details.stg-dd[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
 document.addEventListener('toggle',e=>{ const d=e.target; if(d.classList&&d.classList.contains('ms')&&d.open){ const s=d.querySelector('.ms-search'); if(s) setTimeout(()=>s.focus(),0) } },true);
 let qT; $('#q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value; render(true) },150) });
 
