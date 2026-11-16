@@ -77,6 +77,19 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .bell svg{width:18px;height:18px;flex:none}
 .bell .cnt{margin-left:auto;font-size:11px;background:var(--bad);color:#fff;border-radius:99px;padding:0 7px;line-height:18px}
 .bell+.rail-foot{margin-top:0}
+.rail-tgl{display:flex;align-items:center;gap:11px;padding:7px 10px;border-radius:8px;color:var(--rail-fg);background:none;border:0;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;width:100%;text-align:left;opacity:.75;white-space:nowrap}
+.rail-tgl:hover{background:var(--rail-2);color:var(--rail-hi);opacity:1}
+.rail-tgl svg{width:18px;height:18px;flex:none;transition:transform .15s}
+/* Свёрнутое меню: только иконки, как в amoCRM */
+body.rail-min .app{grid-template-columns:64px minmax(0,1fr)}
+body.rail-min .rail{padding:14px 8px;padding-left:max(8px,env(safe-area-inset-left,0px));align-items:center}
+body.rail-min .brand{padding:0}
+body.rail-min .brand>span,body.rail-min .rail-foot,body.rail-min .nav a span.lbl,body.rail-min .bell .lbl,body.rail-min .rail-tgl .lbl{display:none}
+body.rail-min .nav a,body.rail-min .bell,body.rail-min .rail-tgl{justify-content:center;padding:10px;position:relative;width:auto}
+body.rail-min .nav .cnt,body.rail-min .bell .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
+body.rail-min .rail-tgl svg{transform:scaleX(-1)}
+body.rail-min .ntf{left:64px;width:min(400px,calc(100vw - 64px))}
+body.rail-min .ntf-pop{left:80px}
 .ntf-scrim{position:fixed;inset:0;z-index:44}
 .ntf{position:fixed;left:220px;top:0;bottom:0;width:min(400px,calc(100vw - 220px));z-index:45;background:var(--surface);border-right:1px solid var(--line);box-shadow:10px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
 .ntf>header{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
@@ -364,7 +377,7 @@ table.perm select{font-weight:700;height:32px}
   .nav a span.lbl{display:none}
   .nav .cnt,.bell .cnt{position:absolute;top:1px;right:1px;margin:0;padding:0 5px;line-height:16px;font-size:10px}
   .bell{justify-content:center;padding:10px;width:auto}
-  .bell .lbl{display:none}
+  .bell .lbl,.rail-tgl{display:none}
   .ntf{left:64px;width:calc(100vw - 64px)}
   .ntf-pop{left:16px}
   .me span,.wa-st em{display:none}
@@ -382,6 +395,7 @@ table.perm select{font-weight:700;height:32px}
     <nav class="nav" id="nav"></nav>
     <button type="button" class="bell" id="bell" data-a="ntf-toggle" aria-expanded="false" hidden></button>
     <div class="rail-foot" id="railfoot"></div>
+    <button type="button" class="rail-tgl" id="railTgl" data-a="rail-toggle" aria-label="Свернуть меню" title="Свернуть меню"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg><span class="lbl">Свернуть меню</span></button>
   </aside>
   <div class="main">
     <div class="top">
@@ -1333,6 +1347,12 @@ async function saveMember(){ const o=S.overlay; const name=$('#m-name').value.tr
 
 function confirmBox(text,yesLabel,onYes,note){ if(note==null) note='Это действие нельзя отменить.'; $('#confirmLayer').innerHTML='<div class="scrim top2" data-a="confirm-no"></div><div class="modal confirm" role="alertdialog" aria-modal="true"><div class="mb" style="padding-top:18px"><b style="font-size:16px">'+esc(text)+'</b>'+(note?'<span style="color:var(--muted)">'+esc(note)+'</span>':'')+'</div><footer><button class="btn" data-a="confirm-no">Отмена</button><button class="btn primary" style="background:var(--bad);border-color:var(--bad);color:#fff" data-a="confirm-yes">'+esc(yesLabel)+'</button></footer></div>';
   confirmBox.cb=onYes; $('#confirmLayer [data-a="confirm-yes"]').focus() }
+// Левое меню сворачивается до иконок кнопкой внизу; выбор помним в этом браузере.
+function setRailMin(on,save){ document.body.classList.toggle('rail-min',on); const b=$('#railTgl');
+  if(b){ const t=on?'Развернуть меню':'Свернуть меню'; b.title=t; b.setAttribute('aria-label',t); b.querySelector('.lbl').textContent=t }
+  if(save) try{ localStorage.setItem('broks.railMin',on?'1':'') }catch(e){} }
+try{ setRailMin(localStorage.getItem('broks.railMin')==='1') }catch(e){}
+
 // ---------- Уведомления (колокольчик внизу меню, как в amoCRM) ----------
 // Список собирается из данных: сообщения клиентов по моим и нераспределённым сделкам, переданные мне сделки,
 // задачи от коллег и просроченные задачи, непрочитанные письма. Что уже просмотрено, помним в этом браузере.
@@ -1535,6 +1555,7 @@ const A={
     if(n){ toast('Сначала перенесите '+n+' '+plural(n,'сделку','сделки','сделок')+' из этого этапа'); return }
     if(stages().length<=1){ toast('В воронке должен остаться хотя бы один этап'); return }
     confirmBox('Удалить этап «'+stageOf(id).name+'»?','Удалить',()=>putStages(stages().filter(s=>s.id!==id))) },
+  'rail-toggle':()=>setRailMin(!document.body.classList.contains('rail-min'),true),
   'ntf-toggle':()=>ntfToggle(!S.ntfOpen),
   'ntf-close':()=>ntfToggle(false),
   'ntf-go':el=>ntfOpenItem((S.ntfItems||[])[+el.dataset.i]),
