@@ -42,12 +42,47 @@ $('authForm').onsubmit = async (e) => {
   } catch (err) { $('authError').textContent = err.message; }
 };
 
+// ---------- восстановление пароля ----------
+function showAuthForm(which) {
+  $('authForm').hidden = which !== 'login';
+  $('forgotForm').hidden = which !== 'forgot';
+  $('resetForm').hidden = which !== 'reset';
+  $('authTabs').hidden = which !== 'login';
+}
+$('forgotLink').onclick = (e) => { e.preventDefault(); $('forgotMsg').textContent = ''; showAuthForm('forgot'); };
+document.querySelectorAll('.backToLogin').forEach((a) => (a.onclick = (e) => {
+  e.preventDefault();
+  history.replaceState(null, '', '/');
+  setAuthMode('login');
+  showAuthForm('login');
+}));
+
+$('forgotForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const r = await call('POST', '/auth/forgot', { email: e.target.email.value });
+    $('forgotMsg').textContent = r.message;
+  } catch (err) { $('forgotMsg').textContent = err.message; }
+};
+
+$('resetForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.password.value !== f.password2.value) { $('resetError').textContent = 'Пароли не совпадают'; return; }
+  try {
+    await call('POST', '/auth/reset', { token: new URLSearchParams(location.search).get('reset'), password: f.password.value });
+    history.replaceState(null, '', '/');
+    await boot();
+  } catch (err) { $('resetError').textContent = err.message; }
+};
+
 function sessionStorageSafe(k, v) { try { v === undefined ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} }
 function sessionGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
 
 function showAuth() {
   $('appView').hidden = true;
   $('authView').hidden = false;
+  showAuthForm(new URLSearchParams(location.search).has('reset') ? 'reset' : 'login');
   state.events?.close();
 }
 
@@ -199,6 +234,16 @@ $('rotateSecret').onclick = async () => {
   renderAccount();
 };
 
+$('passwordForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    await api('POST', '/account/password', { currentPassword: f.currentPassword.value, newPassword: f.newPassword.value });
+    f.reset();
+    $('passwordMsg').textContent = 'Пароль изменён.';
+  } catch (err) { $('passwordMsg').textContent = err.message; }
+};
+
 // ---------- события ----------
 function connectEvents() {
   state.events?.close();
@@ -222,6 +267,7 @@ async function boot() {
   const cfg = await call('GET', '/auth/config').catch(() => ({}));
   if (cfg.appName) { document.title = cfg.appName; document.querySelectorAll('.appName').forEach((n) => (n.textContent = cfg.appName)); }
   $('signupTab').hidden = cfg.allowSignup === false;
+  if (new URLSearchParams(location.search).has('reset')) { showAuth(); return; }
   try {
     state.account = await call('GET', '/api/v1/account');
   } catch {

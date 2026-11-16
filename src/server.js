@@ -3,12 +3,15 @@ import express from 'express';
 import {
   accountByApiKey,
   accountBySession,
+  changePassword,
+  createPasswordReset,
   createSession,
   destroySession,
   login,
   publicAccount,
   purgeExpiredSessions,
   register,
+  resetPassword,
   rotateApiKey,
   rotateWebhookSecret,
   SESSION_TTL_MS,
@@ -31,6 +34,7 @@ import { config } from './config.js';
 import { db } from './db.js';
 import { httpError } from './errors.js';
 import { logger } from './logger.js';
+import { sendMail } from './mailer.js';
 import { deliverOnce, onEvent } from './webhook.js';
 
 const app = express();
@@ -112,6 +116,27 @@ web.post('/login', loginLimiter, async (req, res) => {
   res.json({ account: publicAccount(account) });
 });
 
+// Забыли пароль: всегда отвечаем одинаково, чтобы по ответу нельзя было узнать, есть ли такой email
+web.post('/forgot', loginLimiter, (req, res) => {
+  const reset = createPasswordReset(req.body?.email);
+  if (reset) {
+    const link = `${config.publicUrl}/?reset=${reset.token}`;
+    sendMail({
+      to: reset.account.email,
+      subject: `${config.appName}: восстановление пароля`,
+      text: `Здравствуйте!\n\nЧтобы задать новый пароль, откройте ссылку (действует 1 час):\n${link}\n\nЕсли вы не запрашивали сброс, просто проигнорируйте это письмо.`,
+      html: `<p>Здравствуйте!</p><p>Чтобы задать новый пароль, нажмите на ссылку (действует 1 час):</p><p><a href="${link}">Задать новый пароль</a></p><p>Если вы не запрашивали сброс, просто проигнорируйте это письмо.</p>`,
+    }).catch((err) => logger.error({ err: err.message }, 'не удалось отправить письмо'));
+  }
+  res.json({ ok: true, message: 'Если такой email зарегистрирован, мы отправили на него ссылку для сброса пароля.' });
+});
+
+web.post('/reset', loginLimiter, async (req, res) => {
+  const account = await resetPassword(req.body?.token, req.body?.password);
+  setCookie(res, createSession(account.id), SESSION_TTL_MS);
+  res.json({ account: publicAccount(account) });
+});
+
 web.post('/logout', (req, res) => {
   const token = readCookie(req);
   if (token) destroySession(token);
@@ -129,6 +154,12 @@ api.get('/account', (req, res) => res.json(publicAccount(req.account)));
 
 api.patch('/account', webOnly, (req, res) => {
   res.json(publicAccount(updateSettings(req.account.id, { webhookUrl: req.body?.webhookUrl, company: req.body?.company })));
+});
+
+api.post('/account/password', webOnly, async (req, res) => {
+  await changePassword(req.account.id, req.body?.currentPassword, req.body?.newPassword);
+  setCookie(res, createSession(req.account.id), SESSION_TTL_MS); // остальные устройства разлогинены
+  res.json({ ok: true });
 });
 
 api.post('/account/api-key', webOnly, (req, res) => res.json({ apiKey: rotateApiKey(req.account.id) }));

@@ -13,7 +13,7 @@
   <div class="card authCard">
     <h1 class="brand"><span class="logo">B</span> <span class="appName">Brox Connect</span></h1>
     <p class="muted">Подключение WhatsApp к вашей CRM</p>
-    <div class="tabs small">
+    <div class="tabs small" id="authTabs">
       <button class="tab active" data-auth="login">Вход</button>
       <button class="tab" data-auth="register" id="signupTab">Регистрация</button>
     </div>
@@ -23,6 +23,24 @@
       <input name="password" type="password" placeholder="Пароль (от 8 символов)" required minlength="8" autocomplete="current-password">
       <button type="submit" id="authSubmit">Войти</button>
       <p id="authError" class="error"></p>
+      <a href="#" id="forgotLink" class="link">Забыли пароль?</a>
+    </form>
+
+    <form id="forgotForm" hidden>
+      <p class="muted">Укажите email, с которым регистрировались, — пришлём ссылку для сброса пароля.</p>
+      <input name="email" type="email" placeholder="Email" required autocomplete="username">
+      <button type="submit">Отправить ссылку</button>
+      <p id="forgotMsg" class="muted"></p>
+      <a href="#" class="link backToLogin">← Вернуться ко входу</a>
+    </form>
+
+    <form id="resetForm" hidden>
+      <p class="muted">Придумайте новый пароль.</p>
+      <input name="password" type="password" placeholder="Новый пароль (от 8 символов)" required minlength="8" autocomplete="new-password">
+      <input name="password2" type="password" placeholder="Повторите пароль" required minlength="8" autocomplete="new-password">
+      <button type="submit">Сохранить пароль</button>
+      <p id="resetError" class="error"></p>
+      <a href="#" class="link backToLogin">← Вернуться ко входу</a>
     </form>
   </div>
 </section>
@@ -34,7 +52,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="channels">Номера</button>
       <button class="tab" data-tab="chats">Чаты</button>
-      <button class="tab" data-tab="integration">Интеграция</button>
+      <button class="tab" data-tab="integration">Настройки</button>
       <button class="tab" data-tab="events">События</button>
     </nav>
     <div class="row"><span id="company" class="muted"></span><button class="ghost" id="logout">Выйти</button></div>
@@ -88,6 +106,15 @@
         <p id="webhookRes" class="muted"></p>
         <p class="muted">Секрет для проверки подписи (заголовок <code>X-Signature</code> = HMAC-SHA256 тела запроса):</p>
         <div class="row"><code id="webhookSecret"></code><button class="ghost" id="rotateSecret">Сменить</button></div>
+      </div>
+      <div class="card">
+        <h2>Смена пароля</h2>
+        <form id="passwordForm" class="row">
+          <input name="currentPassword" type="password" placeholder="Текущий пароль" required autocomplete="current-password">
+          <input name="newPassword" type="password" placeholder="Новый пароль (от 8 символов)" required minlength="8" autocomplete="new-password">
+          <button>Сменить пароль</button>
+        </form>
+        <p id="passwordMsg" class="muted">После смены пароля выполнится выход на всех остальных устройствах.</p>
       </div>
       <div class="card">
         <h2>Адрес API</h2>

@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS web_sessions (
   expires_at  INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash  TEXT PRIMARY KEY,
+  account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  expires_at  INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS channels (
   id          TEXT PRIMARY KEY,
   account_id  TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,

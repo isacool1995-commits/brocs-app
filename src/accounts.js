@@ -116,4 +116,41 @@ export function rotateWebhookSecret(accountId) {
 
 export function purgeExpiredSessions() {
   db.prepare('DELETE FROM web_sessions WHERE expires_at <= ?').run(now());
+  db.prepare('DELETE FROM password_resets WHERE expires_at <= ?').run(now());
+}
+
+// ---------- пароль ----------
+
+const RESET_TTL_MS = 60 * 60 * 1000; // ссылка действует 1 час
+
+/** Создаёт одноразовый токен сброса. Возвращает null, если email не найден. */
+export function createPasswordReset(email) {
+  const a = db.prepare('SELECT * FROM accounts WHERE email = ?').get(String(email || '').trim());
+  if (!a) return null;
+  db.prepare('DELETE FROM password_resets WHERE account_id = ?').run(a.id); // старые ссылки больше не работают
+  const token = randomId(32);
+  db.prepare('INSERT INTO password_resets (token_hash, account_id, expires_at) VALUES (?, ?, ?)').run(sha256(token), a.id, now() + RESET_TTL_MS);
+  return { account: a, token };
+}
+
+export async function resetPassword(token, password) {
+  if (String(password || '').length < 8) throw httpError(400, 'Пароль — минимум 8 символов');
+  const row = db.prepare('SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > ?').get(sha256(String(token || '')), now());
+  if (!row) throw httpError(400, 'Ссылка недействительна или устарела. Запросите новую.');
+  await setPassword(row.account_id, password);
+  db.prepare('DELETE FROM password_resets WHERE account_id = ?').run(row.account_id);
+  return getAccount(row.account_id);
+}
+
+export async function changePassword(accountId, currentPassword, newPassword) {
+  const a = getAccount(accountId);
+  if (!(await verifyPassword(String(currentPassword || ''), a.password_hash))) throw httpError(400, 'Текущий пароль неверный');
+  if (String(newPassword || '').length < 8) throw httpError(400, 'Новый пароль — минимум 8 символов');
+  await setPassword(accountId, newPassword);
+}
+
+async function setPassword(accountId, password) {
+  db.prepare('UPDATE accounts SET password_hash = ? WHERE id = ?').run(await hashPassword(String(password)), accountId);
+  // Выходим на всех устройствах — если пароль меняли из-за утечки
+  db.prepare('DELETE FROM web_sessions WHERE account_id = ?').run(accountId);
 }
