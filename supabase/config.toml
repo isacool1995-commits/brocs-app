@@ -1,0 +1,2 @@
+[functions.wa-relay]
+verify_jwt = false
