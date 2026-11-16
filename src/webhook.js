@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getAccount } from './accounts.js';
+import { db } from './db.js';
 import { logger } from './logger.js';
 
 // Отдельная очередь на каждую компанию: медленная CRM одной компании не тормозит остальные
@@ -12,8 +13,12 @@ export const onEvent = (fn) => (listeners.add(fn), () => listeners.delete(fn));
 export const sign = (secret, body) => crypto.createHmac('sha256', secret).update(body).digest('hex');
 
 /** Отправляет событие в CRM компании, которой принадлежит канал. */
+const channelPhone = db.prepare('SELECT phone FROM channels WHERE id = ?');
+
 export function emit(accountId, event, channelId, data) {
-  const payload = { event, channelId, timestamp: Date.now(), data };
+  // channelPhone — номер, на который пришло событие: CRM по нему отличает свои номера от чужих
+  const phone = data?.phone ?? (channelId ? channelPhone.get(channelId)?.phone : null) ?? null;
+  const payload = { event, channelId, channelPhone: phone, timestamp: Date.now(), data };
   for (const fn of listeners) fn(accountId, payload);
 
   let q = queues.get(accountId);

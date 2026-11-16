@@ -35,6 +35,7 @@ import { db } from './db.js';
 import { httpError } from './errors.js';
 import { logger } from './logger.js';
 import { sendMail } from './mailer.js';
+import { verifyMediaSig } from './secret.js';
 import { deliverOnce, onEvent } from './webhook.js';
 
 const app = express();
@@ -200,9 +201,12 @@ app.use('/api/v1', api);
 
 // Медиафайлы: отдаём только компании-владельцу канала
 const ownsChannel = db.prepare('SELECT 1 FROM channels WHERE id = ? AND account_id = ?');
-app.get('/media/:channelId/:file', auth, (req, res) => {
+// Подписанная ссылка (?sig=…) открывается без ключа — так менеджер видит фото прямо в CRM
+const mediaAuth = (req, res, next) =>
+  req.query.sig && verifyMediaSig(`/media/${req.params.channelId}/${req.params.file}`, req.query.sig) ? next() : auth(req, res, next);
+app.get('/media/:channelId/:file', mediaAuth, (req, res) => {
   const { channelId, file } = req.params;
-  if (!ownsChannel.get(channelId, req.account.id) || !/^[\w-]+\.\w{1,10}$/.test(file)) throw httpError(404, 'Файл не найден');
+  if (!/^[\w-]+\.\w{1,10}$/.test(file) || (req.account && !ownsChannel.get(channelId, req.account.id))) throw httpError(404, 'Файл не найден');
   res.sendFile(path.join(mediaDir, channelId, file), { dotfiles: 'deny' }, (err) => err && !res.headersSent && res.status(404).json({ error: 'Файл не найден' }));
 });
 

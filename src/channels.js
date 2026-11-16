@@ -16,6 +16,7 @@ import { config } from './config.js';
 import { db, now } from './db.js';
 import { httpError } from './errors.js';
 import { logger } from './logger.js';
+import { signMediaPath } from './secret.js';
 import { emit } from './webhook.js';
 
 const sessionsDir = path.join(config.dataDir, 'sessions');
@@ -348,7 +349,7 @@ async function saveMedia(channelId, l, msg, info) {
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, file), buf);
     return {
-      url: `${config.publicUrl}/media/${channelId}/${file}`,
+      url: config.publicUrl + signMediaPath(`/media/${channelId}/${file}`),
       mimetype: info?.mimetype ?? null,
       fileName: info?.fileName ?? file,
       size: buf.length,
