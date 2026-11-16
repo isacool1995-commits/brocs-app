@@ -197,7 +197,19 @@ td.r,th.r{text-align:right}
 .dleft{overflow-y:auto;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:14px 18px 24px}
 .dtop{display:flex;justify-content:space-between;gap:8px;margin:0 -8px}
 .cf-block{display:flex;flex-direction:column;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
-.cf-multi .chk-l{font-size:12.5px;padding:4px 8px}
+.ms{position:relative}
+.ms-sum{font-size:14px;letter-spacing:0;text-transform:none;display:flex;align-items:center;cursor:pointer;list-style:none;padding-right:30px;position:relative;font-weight:600;color:var(--fg)}
+.ms-sum::-webkit-details-marker{display:none}
+.ms-sum::after{content:"";position:absolute;right:12px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
+.ms[open] .ms-sum::after{transform:translateY(-20%) rotate(-135deg)}
+.ms-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-empty{color:var(--muted);font-weight:500}
+.ms-pop{position:absolute;z-index:6;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:6px}
+.ms-search{height:32px}
+.ms-list{max-height:240px;overflow-y:auto;display:flex;flex-direction:column}
+.ms-opt{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--fg);text-transform:none;letter-spacing:0}
+.ms-opt:hover{background:var(--surface-2)}
+.ms-opt input{width:16px;height:16px;accent-color:var(--accent);flex:none}
 .fe-row{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}
 .fe-head{display:flex;gap:6px;align-items:center}
 .lf-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
@@ -650,7 +662,10 @@ const HAS_OPTS=t=>t==='select'||t==='multiselect';
 function dealFields(){ const l=((S.config&&S.config.dealfields)||{}).list; return Array.isArray(l)?l:[] }
 function fieldInput(f,v){ const id='cf-'+esc(f.id);
   if(f.type==='select') return '<select class="inp" id="'+id+'"><option value="">—</option>'+(f.options||[]).map(o=>'<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>').join('')+(v&&!(f.options||[]).includes(v)?'<option selected>'+esc(v)+'</option>':'')+'</select>';
-  if(f.type==='multiselect'){ const set=Array.isArray(v)?v:[]; return '<div class="chips cf-multi" id="'+id+'">'+(f.options||[]).map((o,i)=>'<label class="chk-l"><input type="checkbox" id="'+id+'-'+i+'" data-cf="'+esc(f.id)+'" value="'+esc(o)+'"'+(set.includes(o)?' checked':'')+'> '+esc(o)+'</label>').join('')+'</div>' }
+  if(f.type==='multiselect'){ const set=Array.isArray(v)?v:[], opts=f.options||[];
+    return '<details class="ms" id="'+id+'"><summary class="inp ms-sum"><span class="ms-text'+(set.length?'':' ms-empty')+'">'+esc(set.length?set.join(', '):'Не выбрано')+'</span></summary><div class="ms-pop">'+
+      (opts.length>8?'<input class="inp ms-search" type="search" placeholder="Поиск…" aria-label="Поиск по вариантам">':'')+
+      '<div class="ms-list">'+opts.map((o,i)=>'<label class="ms-opt"><input type="checkbox" id="'+id+'-'+i+'" data-cf="'+esc(f.id)+'" value="'+esc(o)+'"'+(set.includes(o)?' checked':'')+'> <span>'+esc(o)+'</span></label>').join('')+'</div></div></details>' }
   if(f.type==='textarea') return '<textarea class="inp" id="'+id+'" rows="2">'+esc(v||'')+'</textarea>';
   if(f.type==='checkbox') return '<label class="chk-l" style="align-self:flex-start"><input type="checkbox" id="'+id+'"'+(v?' checked':'')+'> Да</label>';
   const type={number:'number',date:'date',url:'url'}[f.type]||'text';
@@ -1412,7 +1427,15 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='role-flag'){ const k=el.dataset.k, v=el.checked; saveRole(S.roleSel,r=>{ r[k]=v }) }
   else if(a==='stage-name'){ const v=el.value.trim(); if(!v){ el.value=stageOf(el.dataset.id).name; return } putStages(stages().map(s=>s.id===el.dataset.id?Object.assign({},s,{name:v.slice(0,60)}):s)) } });
 document.addEventListener('submit',e=>{ if(e.target.id==='dealForm'){ e.preventDefault(); saveDeal() } });
-document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa() });
+document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa();
+  if(e.target.classList&&e.target.classList.contains('ms-search')){ const q=e.target.value.trim().toLowerCase(), box=e.target.closest('.ms');
+    box.querySelectorAll('.ms-opt').forEach(l=>{ l.hidden=!!q&&!l.textContent.toLowerCase().includes(q) }) } });
+// Раскрывающиеся списки с несколькими вариантами: подпись показывает выбранное, клик снаружи закрывает список.
+document.addEventListener('change',e=>{ const ms=e.target.closest&&e.target.closest('.ms'); if(!ms||!e.target.dataset.cf) return;
+  const vals=[...ms.querySelectorAll('input[data-cf]:checked')].map(x=>x.value), t=ms.querySelector('.ms-text');
+  t.textContent=vals.length?vals.join(', '):'Не выбрано'; t.classList.toggle('ms-empty',!vals.length) });
+document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
+document.addEventListener('toggle',e=>{ const d=e.target; if(d.classList&&d.classList.contains('ms')&&d.open){ const s=d.querySelector('.ms-search'); if(s) setTimeout(()=>s.focus(),0) } },true);
 let qT; $('#q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value; render(true) },150) });
 
 // перетаскивание карточек
