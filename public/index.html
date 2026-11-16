@@ -949,12 +949,24 @@ function drawMailBoxes(){ const boxes=S.boxes||[];
     '<div class="grid2"><label class="f">Сервер SMTP<input class="inp" id="mb-smtp" placeholder="smtp.mail.ru"></label><label class="f">Порт SMTP<input class="inp num" id="mb-smtp-port" type="number" value="465"></label></div></div>',
     '<button class="btn" data-a="close">Закрыть</button><button class="btn primary" data-a="mail-box-add">Проверить и подключить</button>') }
 // ---------- Настройки ----------
-const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность']];
+const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность'],['messaging','Мессенджеры']];
+function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.config&&S.config.messaging_last)||null, hook='https://brocs-app.vercel.app/api/wa-webhook';
+  const evName={test:'тест из кабинета','message.incoming':'входящее сообщение','message.outgoing':'исходящее сообщение','message.status':'статус сообщения'};
+  let h='<div class="vh"><h1>Мессенджеры</h1></div>';
+  h+='<section class="panel"><header><h2>WhatsApp, Telegram, MAX через ProfitBot</h2></header><div class="set-grid">'+
+    '<label class="set-row"><span>Номер для «Брокс»</span><input class="inp num" id="msg-numbers" data-a="msg-numbers" value="'+esc(m.numbers||'')+'" placeholder="77476754306"></label>'+
+    '<div class="set-row"><span>Адрес вебхука</span><div class="crow"><code class="num" style="overflow-wrap:anywhere">'+esc(hook)+'</code><button type="button" class="btn sm" data-a="copy" data-v="'+esc(hook)+'">Копировать</button></div></div>'+
+    '</div><p class="set-hint">«Брокс» принимает и отправляет сообщения только с этого номера. Сообщения других номеров вашего аккаунта ProfitBot, например подключённых к amoCRM, «Брокс» пропускает. Можно указать несколько номеров через запятую. Номер сохраняется, когда вы уходите из поля.</p></section>';
+  h+='<section class="panel"><header><h2>Связь с ProfitBot</h2></header><div class="permx" style="border-top:0">'+
+    (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>, '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
+      :'<p class="notice warn" style="margin:0">От ProfitBot ещё не пришло ни одного события. Проверьте в кабинете ProfitBot → «API», что адрес вебхука сохранён, и нажмите там «Отправить тест».</p>')+
+    '<span class="set-hint" style="margin:0">Страница обновляется сама, когда приходит событие.</span></div></section>';
+  return h }
 const TIMEZONES=[['Asia/Almaty','(GMT +05:00) Алматы, Астана'],['Asia/Aqtobe','(GMT +05:00) Актобе, Атырау, Актау'],['Asia/Tashkent','(GMT +05:00) Ташкент'],['Asia/Bishkek','(GMT +06:00) Бишкек'],['Europe/Moscow','(GMT +03:00) Москва'],['Asia/Dubai','(GMT +04:00) Дубай'],['Europe/Istanbul','(GMT +03:00) Стамбул']];
 function vSettings(){
   if(!isBoss()) return '<div class="vh"><h1>Настройки</h1></div><div class="panel">'+emptyBox('Раздел недоступен','Настройки меняет администратор.')+'</div>';
   const t=SET_TABS.some(x=>x[0]===S.setTab)?S.setTab:'general';
-  return '<div class="settings"><nav class="set-nav" aria-label="Разделы настроек">'+SET_TABS.map(([k,l])=>'<button data-a="set-tab" data-v="'+k+'" aria-current="'+(t===k)+'">'+l+'</button>').join('')+'</nav><div class="set-body">'+({general:vSetGeneral,users:vSetUsers,security:vSetSecurity}[t])()+'</div></div>' }
+  return '<div class="settings"><nav class="set-nav" aria-label="Разделы настроек">'+SET_TABS.map(([k,l])=>'<button data-a="set-tab" data-v="'+k+'" aria-current="'+(t===k)+'">'+l+'</button>').join('')+'</nav><div class="set-body">'+({general:vSetGeneral,users:vSetUsers,security:vSetSecurity,messaging:vSetMessaging}[t])()+'</div></div>' }
 function vSetGeneral(){ const g=gen();
   const sel=(k,opts,v)=>'<select class="inp" id="g-'+k+'" data-a="gen-set" data-k="'+k+'">'+opts.map(([a,b])=>'<option value="'+esc(a)+'"'+(String(v)===String(a)?' selected':'')+'>'+esc(b)+'</option>').join('')+'</select>';
   const row=(l,c)=>'<label class="set-row"><span>'+l+'</span>'+c+'</label>';
@@ -1344,6 +1356,7 @@ const A={
   'fe-del':el=>{ feCollect(); S.overlay.list.splice(+el.dataset.i,1); drawFieldsEditor() },
   'fe-up':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i>0){ [L[i-1],L[i]]=[L[i],L[i-1]] } drawFieldsEditor() },
   'fe-down':el=>{ feCollect(); const L=S.overlay.list, i=+el.dataset.i; if(i<L.length-1){ [L[i+1],L[i]]=[L[i],L[i+1]] } drawFieldsEditor() },
+  copy:el=>{ const v=el.dataset.v; (navigator.clipboard?navigator.clipboard.writeText(v):Promise.reject()).then(()=>toast('Скопировано')).catch(()=>toast(v)) },
   'lf-sort':el=>{ const lf=lfGet(), k=el.dataset.k; if(lf.sort===k) lf.dir=lf.dir==='asc'?'desc':'asc'; else { lf.sort=k; lf.dir=k==='title'||k==='contact'||k==='owner'?'asc':'desc' } lfSave(); render(true) },
   'lf-reset':()=>{ const lf=lfGet(); Object.assign(lf,{stage:'open',period:'all',field:'',fval:''}); lfSave(); render(true) },
   'stagereq-open':()=>{ if(!isBoss()) return; const o=S.overlay; const pid=o&&o.back&&S.deals[o.back.id]?dealPipe(S.deals[o.back.id]):pipeOf(S.pipe).id;
@@ -1404,6 +1417,8 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='sel-new'){ $('#'+el.dataset.t).hidden=el.value!=='__new' }
   else if(a==='stage-sel'){ renderStageBar(el.value) }
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
+  else if(a==='msg-numbers'){ const v=el.value.split(/[,;\s]+/).map(normPhone).filter(Boolean).join(', '); el.value=v;
+    saveConfig('messaging',{numbers:v}).then(ok=>{ if(ok) toast(v?'Номер сохранён':'Номер очищен') }) }
   else if(a==='lf'){ const lf=lfGet(), k=el.dataset.k; lf[k]=el.value; if(k==='field') lf.fval=''; lfSave(); el.blur(); render(true) }
   else if(a==='lf-col'){ const lf=lfGet(), v=el.value; lf.cols=lf.cols.filter(x=>x!==v); if(el.checked) lf.cols.push(v); lfSave(); S.lfColsOpen=true; render(true); const dd=$('.lf-cols'); if(dd) dd.open=true }
   else if(a==='sr-pipe'){ S.overlay.pid=el.value; S.overlay.openStage=null; drawStageReq() }

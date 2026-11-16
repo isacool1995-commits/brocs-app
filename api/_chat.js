@@ -33,9 +33,13 @@ async function firstStage() {
 
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-// Номера Profit Bot, с которыми работает «Брокс». Остальные номера аккаунта (например, подключённые к amoCRM) пропускаем.
-const NUMBERS = String(process.env.PROFITBOT_NUMBERS || process.env.PROFITBOT_FROM || '')
-  .split(/[,;\s]+/).map(digits).filter(Boolean);
-const ourNumber = phone => !NUMBERS.length || NUMBERS.includes(digits(phone));
+// Номера Profit Bot, с которыми работает «Брокс». Берём из «Настройки → Мессенджеры», иначе из переменной Vercel.
+// Остальные номера аккаунта (например, подключённые к amoCRM) пропускаем.
+async function ourNumbers() {
+  const cfg = await getDoc('config', 'messaging');
+  const src = (cfg && cfg.numbers) || process.env.PROFITBOT_NUMBERS || process.env.PROFITBOT_FROM || '';
+  return String(src).split(/[,;\s]+/).map(normPhone).filter(Boolean);
+}
+const isOur = (list, phone) => !list.length || list.includes(normPhone(phone));
 
-module.exports = { CHANNELS, NUMBERS, ourNumber, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };
+module.exports = { CHANNELS, ourNumbers, isOur, digits, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc };

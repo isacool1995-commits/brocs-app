@@ -2,7 +2,7 @@
 // Каждый запрос проверяется по подписи X-Signature (HMAC-SHA256 с секретом из кабинета Profit Bot).
 const crypto = require('crypto');
 const { configured } = require('./_sb');
-const { CHANNELS, ourNumber, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc } = require('./_chat');
+const { CHANNELS, ourNumbers, isOur, normPhone, findContact, openDealFor, firstStage, newId, sb, getDoc, putDoc } = require('./_chat');
 
 const SECRET = process.env.PROFITBOT_WEBHOOK_SECRET || '';
 
@@ -82,7 +82,13 @@ module.exports = async (req, res) => {
   if (!validSignature(raw, req.headers['x-signature'])) return res.status(401).json({ error: 'Неверная подпись.' });
   let ev;
   try { ev = JSON.parse(raw.toString('utf8')); } catch (e) { return res.status(400).json({ error: 'Неверный JSON.' }); }
-  if (ev.instance && !ourNumber(ev.instance.phone)) return res.status(200).json({ ok: true, skipped: 'чужой номер' });
+  if (ev.event === 'test') {
+    await putDoc('config', 'messaging_last', { event: 'test', at: new Date().toISOString() }).catch(() => {});
+    return res.status(200).json({ ok: true });
+  }
+  const numbers = await ourNumbers();
+  await putDoc('config', 'messaging_last', { event: ev.event, at: new Date().toISOString(), instance: ev.instance ? ev.instance.phone : '', ours: !ev.instance || isOur(numbers, ev.instance.phone) }).catch(() => {});
+  if (ev.instance && !isOur(numbers, ev.instance.phone)) return res.status(200).json({ ok: true, skipped: 'чужой номер' });
   try {
     if (ev.event === 'message.status') await onStatus(ev);
     else if (ev.event === 'message.incoming' || ev.event === 'message.outgoing') await onMessage(ev);
