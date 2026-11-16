@@ -339,6 +339,11 @@ td.r,th.r{text-align:right}
 .stg-dd>summary::-webkit-details-marker{display:none}
 .stg-dd>summary:hover{filter:brightness(.95);box-shadow:0 0 0 1px var(--line)}
 .stg-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:9;width:290px;max-height:min(420px,60vh);overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.22);padding:6px}
+.stg-pipe{margin:2px 2px 6px;position:relative}
+.stg-pipe>summary{list-style:none;cursor:pointer;font-weight:800;font-size:14px;padding:8px 10px;border-radius:7px;background:var(--surface-2);display:flex;justify-content:space-between}
+.stg-pipe>summary::-webkit-details-marker{display:none}
+.stg-pipes{display:flex;flex-direction:column;gap:2px;padding:4px 0;border-bottom:1px solid var(--line);margin-bottom:4px}
+.stg-pipes button{font-weight:600}
 .stg-pop h4{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:8px 8px 4px}
 .stg-pop button{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:7px 8px;border-radius:6px;font:inherit;font-size:13.5px;text-align:left;cursor:pointer;color:var(--fg)}
 .stg-pop button:hover{background:var(--surface-2)}
@@ -1318,18 +1323,20 @@ async function addDealTag(raw){ let t=String(raw||'').replace(/^#+/,'').replace(
   const cur=dealTags(); if(cur.some(x=>x.toLowerCase()===t.toLowerCase())){ renderDealTags(true); return }
   if(cur.length>=20){ toast('У сделки может быть не больше 20 тегов'); return }
   await setDealTags(cur.concat([t])); const i=$('#tagInp'); if(i) i.focus() }
-// Метка этапа открывает список всех воронок и этапов, как в amoCRM: выбранный этап применяется сразу.
-function stageMenu(cur,pname,lbl){ const o=S.overlay||{}, pid=o.pipe||S.pipe;
+// Метка этапа открывает список этапов, как в amoCRM. Сверху выбор воронки «Brocs ▾»: другая воронка
+// только показывает свои этапы, а переводит сделку выбор этапа.
+function stagePop(cur){ const o=S.overlay||{}, pid=o.pipe||S.pipe, vp=S.stgView&&pipelines().some(p=>p.id===S.stgView)?S.stgView:pid;
   const item=(p,s,name,color)=>'<button type="button" data-a="stage-go" data-p="'+esc(p)+'" data-v="'+esc(s)+'" aria-current="'+(p===pid&&s===cur)+'"><i class="dot" style="background:'+color+'"></i>'+esc(name)+'</button>';
+  const ps=pipelines().filter(p=>pipeOk(p.id)||p.id===pid);
+  return '<details class="stg-pipe"><summary>'+esc(pipeOf(vp).name)+' <span aria-hidden="true">▾</span></summary><div class="stg-pipes">'+ps.map(p=>'<button type="button" data-a="stg-view" data-p="'+esc(p.id)+'" aria-current="'+(p.id===vp)+'">'+esc(p.name)+'</button>').join('')+'</div></details>'+
+    stagesOf(vp).map(s=>item(vp,s.id,s.name,s.color)).join('')+
+    '<h4>Закрыть</h4>'+item(vp,WON,'Успешно реализовано','var(--ok)')+item(vp,LOST,'Закрыто: отказ','var(--bad)')+item(vp,COLD,'Холодная','#4F86C6') }
+function stageMenu(cur,pname,lbl){ S.stgView=null;
   return '<details class="stg-dd"><summary class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'" title="Выбрать воронку и этап"><i style="background:'+lbl.color+'"></i><span style="opacity:.65;font-weight:600">'+esc(pname)+' ·</span> '+esc(lbl.name)+' <span aria-hidden="true">▾</span></summary>'+
-    '<div class="stg-pop" role="menu">'+pipelines().filter(p=>pipeOk(p.id)||p.id===pid).map(p=>'<h4>'+esc(p.name)+'</h4>'+stagesOf(p.id).map(s=>item(p.id,s.id,s.name,s.color)).join('')).join('')+
-    '<h4>Закрыть</h4>'+item(pid,WON,'Успешно реализовано','var(--ok)')+item(pid,LOST,'Закрыто: отказ','var(--bad)')+item(pid,COLD,'Холодная','#4F86C6')+'</div></details>' }
-function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return; const st=stagesOf((S.overlay&&S.overlay.pipe)||S.pipe); const idx=st.findIndex(s=>s.id===cur);
-  const lbl=stageOf(cur), pname=pipeOf((S.overlay&&S.overlay.pipe)||S.pipe).name, n=st.length+1;
-  const tip=(i,name)=>' data-tip="'+esc(pname+'\n'+(i+1)+'. '+name+(i<idx?' ✓':''))+'" class="'+(i<n/4?'tip-l':i>=n*3/4?'tip-r':'')+'"';
-  box.innerHTML='<div class="stagebar">'+st.map((s,i)=>{ const on=cur===WON||(idx>=0&&i<=idx); return '<button type="button" data-a="stage-pick" data-v="'+esc(s.id)+'"'+tip(i,s.name+(s.id===cur?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: '+esc(s.name)+'" style="background:'+(on?(cur===WON?'var(--ok)':lbl.color):'var(--surface-2)')+'"></button>' }).join('')+
-   '<button type="button" data-a="stage-pick" data-v="'+WON+'"'+tip(st.length,'Успешно реализовано'+(cur===WON?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
-   '<div class="stagelbl">'+stageMenu(cur,pname,lbl)+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
+    '<div class="stg-pop" role="menu" id="stgPop">'+stagePop(cur)+'</div></details>' }
+function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return;
+  const lbl=stageOf(cur), pname=pipeOf((S.overlay&&S.overlay.pipe)||S.pipe).name;
+  box.innerHTML='<div class="stagelbl">'+stageMenu(cur,pname,lbl)+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
 
 function normPhone(p){ let s=String(p||'').replace(/\D/g,''); if(s.length===11&&s[0]==='8') s='7'+s.slice(1); if(s.length===10) s='7'+s; return s.length>=10?s:'' }
 function lastChannel(dealId){ const cs=list('chat').filter(c=>c.deal===dealId).sort((a,b)=>(b.at||'').localeCompare(a.at||'')); return (cs[0]&&cs[0].channel)||'whatsapp' }
@@ -1571,6 +1578,7 @@ const A={
   'qt-add':async()=>{ const text=$('#qt-text').value.trim(); if(!text){ toast('Опишите задачу'); $('#qt-text').focus(); return } const v=$('#qt-due').value;
     const ok=await put('tasks',newId(),{text,type:$('#qt-type').value,due:v?new Date(v).toISOString():'',owner:$('#qt-owner').value,deal:S.overlay.id,done:false,createdAt:now(),by:S.me});
     if(ok){ $('#qt-text').value=''; toast('Задача поставлена'); renderDealLive(true) } },
+  'stg-view':el=>{ const d=el.closest('details'); S.stgView=el.dataset.p; const pop=$('#stgPop'); if(pop){ const cur=($('#d-stage')||{}).value; pop.innerHTML=stagePop(cur) } if(d) d.open=false },
   'stage-go':el=>{ const o=S.overlay, p=el.dataset.p, v=el.dataset.v; const dd=el.closest('details'); if(dd) dd.open=false;
     if(o.isNew){ o.pipe=p; const ps=$('#d-pipe'); if(ps) ps.value=p; const s=$('#d-stage'); s.innerHTML=stageOptions(p,v); s.value=v; renderStageBar(v) } else moveDeal(o.id,v,p) },
   'stage-pick':el=>{ const o=S.overlay; const v=el.dataset.v; $('#d-stage').value=v; if(o.isNew||o.pipe!==dealPipe(S.deals[o.id])) renderStageBar(v); else moveDeal(o.id,v) },
@@ -1768,7 +1776,7 @@ document.addEventListener('input',e=>{ if(e.target.id==='waText') updateWa();
 document.addEventListener('change',e=>{ const ms=e.target.closest&&e.target.closest('.ms'); if(!ms||!e.target.dataset.cf) return;
   const vals=[...ms.querySelectorAll('input[data-cf]:checked')].map(x=>x.value), t=ms.querySelector('.ms-text');
   t.textContent=vals.length?vals.join(', '):'Не выбрано'; t.classList.toggle('ms-empty',!vals.length) });
-document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open],details.stg-dd[open],details.pipe-dd[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false }) });
+document.addEventListener('click',e=>{ document.querySelectorAll('details.ms[open],details.stg-dd[open],details.pipe-dd[open]').forEach(d=>{ if(e.target.isConnected&&!d.contains(e.target)) d.open=false }) });
 document.addEventListener('toggle',e=>{ const d=e.target; if(d.classList&&d.classList.contains('ms')&&d.open){ const s=d.querySelector('.ms-search'); if(s) setTimeout(()=>s.focus(),0) } },true);
 let qT; $('#q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value; render(true) },150) });
 
