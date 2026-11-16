@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brox Connect</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<!-- Вход / регистрация -->
+<section id="authView" class="auth" hidden>
+  <div class="card authCard">
+    <h1 class="brand"><span class="logo">B</span> <span class="appName">Brox Connect</span></h1>
+    <p class="muted">Подключение WhatsApp к вашей CRM</p>
+    <div class="tabs small">
+      <button class="tab active" data-auth="login">Вход</button>
+      <button class="tab" data-auth="register" id="signupTab">Регистрация</button>
+    </div>
+    <form id="authForm">
+      <input name="company" placeholder="Название компании" id="companyField" hidden>
+      <input name="email" type="email" placeholder="Email" required autocomplete="username">
+      <input name="password" type="password" placeholder="Пароль (от 8 символов)" required minlength="8" autocomplete="current-password">
+      <button type="submit" id="authSubmit">Войти</button>
+      <p id="authError" class="error"></p>
+    </form>
+  </div>
+</section>
+
+<!-- Личный кабинет -->
+<section id="appView" hidden>
+  <header class="top">
+    <div class="brand"><span class="logo">B</span> <span class="appName">Brox Connect</span></div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="channels">Номера</button>
+      <button class="tab" data-tab="chats">Чаты</button>
+      <button class="tab" data-tab="integration">Интеграция</button>
+      <button class="tab" data-tab="events">События</button>
+    </nav>
+    <div class="row"><span id="company" class="muted"></span><button class="ghost" id="logout">Выйти</button></div>
+  </header>
+
+  <main>
+    <div id="tab-channels" class="panel">
+      <div class="card">
+        <div class="row between">
+          <h2>Подключённые номера</h2>
+          <div class="row"><input id="newName" placeholder="Название, например «Отдел продаж»"><button id="add">+ Подключить номер</button></div>
+        </div>
+        <p class="muted">Номер подключается как «связанное устройство»: телефон остаётся у сотрудника, а переписка идёт в CRM.</p>
+        <div id="channels" class="grid"></div>
+      </div>
+      <div class="card warn">
+        <strong>Как снизить риск блокировки номера.</strong> Отвечайте в основном тем, кто написал первым, не делайте массовых рассылок
+        и холодных сообщений. Новые номера «прогревайте» обычной перепиской.
+      </div>
+    </div>
+
+    <div id="tab-chats" class="panel" hidden>
+      <div class="card chatLayout">
+        <aside>
+          <select id="chatChannel"></select>
+          <div class="row"><input id="newChatTo" placeholder="Новый чат: 7999…" style="flex:1"><button id="openChat">Открыть</button></div>
+          <div id="chatList" class="chatList"></div>
+        </aside>
+        <section class="thread">
+          <div id="threadHead" class="threadHead muted">Выберите диалог</div>
+          <div id="thread" class="messages"></div>
+          <form id="replyForm" class="row reply" hidden>
+            <input id="replyText" placeholder="Сообщение" autocomplete="off" style="flex:1">
+            <button>Отправить</button>
+          </form>
+        </section>
+      </div>
+    </div>
+
+    <div id="tab-integration" class="panel" hidden>
+      <div class="card">
+        <h2>API-ключ</h2>
+        <p class="muted">CRM передаёт его в заголовке <code>Authorization: Bearer …</code>. Полный ключ показывается только один раз.</p>
+        <div class="row"><code id="apiKeyHint"></code><button class="ghost" id="rotateKey">Выпустить новый ключ</button></div>
+        <div id="newKeyBox" class="keyBox" hidden><p>Новый ключ — сохраните его сейчас:</p><code id="newKey"></code> <button id="copyKey">Копировать</button></div>
+      </div>
+      <div class="card">
+        <h2>Webhook</h2>
+        <p class="muted">Сюда сервис отправляет входящие сообщения, статусы доставки и состояние номеров (POST, JSON).</p>
+        <div class="row"><input id="webhookUrl" placeholder="https://your-crm.example.com/api/whatsapp/webhook" style="flex:1"><button id="saveWebhook">Сохранить</button><button class="ghost" id="testWebhook">Проверить</button></div>
+        <p id="webhookRes" class="muted"></p>
+        <p class="muted">Секрет для проверки подписи (заголовок <code>X-Signature</code> = HMAC-SHA256 тела запроса):</p>
+        <div class="row"><code id="webhookSecret"></code><button class="ghost" id="rotateSecret">Сменить</button></div>
+      </div>
+      <div class="card">
+        <h2>Адрес API</h2>
+        <code id="apiBase"></code>
+        <p class="muted">Полная документация — в файле README.md проекта.</p>
+      </div>
+    </div>
+
+    <div id="tab-events" class="panel" hidden>
+      <div class="card">
+        <h2>События в реальном времени</h2>
+        <p class="muted">Ровно то же уходит в вашу CRM через webhook.</p>
+        <pre id="log"></pre>
+      </div>
+    </div>
+  </main>
+</section>
+
+<script src="/app.js"></script>
+</body>
+</html>
