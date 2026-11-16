@@ -952,7 +952,8 @@ function drawMailBoxes(){ const boxes=S.boxes||[];
 // ---------- Настройки ----------
 const SET_TABS=[['general','Общие настройки'],['users','Пользователи'],['security','Безопасность'],['messaging','Мессенджеры']];
 // Связь с ProfitBot считаем рабочей, если от него пришло хотя бы одно событие (тест или сообщение).
-function waStatus(){ const last=S.config&&S.config.messaging_last;
+function waStatus(){ const last=S.config&&S.config.messaging_last, snd=S.config&&S.config.messaging_send;
+  if(snd&&snd.ok===false&&snd.at&&(!last||!last.at||snd.at>last.at)) return {cls:'bad',icon:'✕',text:'WhatsApp отключён',hint:'Номер +'+snd.from+' отключён в ProfitBot ('+fmtDate(snd.at,true)+'). Нужно заново подключить его в кабинете ProfitBot'};
   if(!last||!last.at) return {cls:'bad',icon:'✕',text:'WhatsApp не подключён',hint:'От ProfitBot ещё не пришло ни одного события'};
   const days=Math.floor((Date.now()-new Date(last.at))/864e5), when='Последнее событие от ProfitBot: '+fmtDate(last.at,true);
   if(days>7) return {cls:'warn',icon:'!',text:'WhatsApp: тишина '+days+' дн.',hint:when};

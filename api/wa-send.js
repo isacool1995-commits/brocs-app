@@ -44,9 +44,21 @@ module.exports = async (req, res) => {
     });
     pj = await pr.json().catch(() => ({}));
   } catch (e) { return res.status(502).json({ error: 'Profit Bot не отвечает. Повторите позже.' }); }
-  if (!pr.ok) return res.status(400).json({ error: (pj.error && pj.error.message) || 'Profit Bot не принял сообщение.' });
-
   const now = new Date().toISOString();
+  const code = (pj.error && pj.error.code) || '';
+  // Итог последней отправки виден в значке связи: так CRM узнаёт, что номер отключился в Profit Bot.
+  if (pr.ok || code === 'instance_not_authorized' || code === 'instance_not_found') {
+    await putDoc('config', 'messaging_send', { ok: pr.ok, code, from, at: now }).catch(() => {});
+  }
+  if (!pr.ok) {
+    const hint = {
+      instance_not_authorized: 'Номер +' + from + ' отключён в Profit Bot. Откройте кабинет Profit Bot → «Управление каналами» → WA/' + from.slice(-4) + ', нажмите «Подключить» и отсканируйте QR-код телефоном с этим номером.',
+      instance_not_found: 'Номер +' + from + ' не подключён к аккаунту Profit Bot. Проверьте номер в «Настройки → Мессенджеры».',
+      unauthorized: 'Profit Bot не принял API-ключ. Проверьте PROFITBOT_API_KEY в настройках Vercel.'
+    }[code];
+    return res.status(400).json({ error: hint || (pj.error && pj.error.message) || 'Profit Bot не принял сообщение.' });
+  }
+
   const doc = { deal: rows[0].id, contact: deal.contact, owner: deal.owner || '', channel, dir: 'out', text, type: 'text',
     from, chatId: to, source: 'crm', by: user.id, msgId: pj.id || '', status: pj.status || 'queued', at: now };
   const id = 'c_out_' + String(pj.id || Date.now().toString(36)).replace(/[^A-Za-z0-9_.~:@+-]/g, '');
