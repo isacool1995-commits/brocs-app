@@ -307,6 +307,13 @@ td.r,th.r{text-align:right}
 .stagebar{display:flex;gap:3px}
 .stagebar button{flex:1;height:10px;border:0;border-radius:5px;padding:0}
 .stagebar button:hover{filter:brightness(.9)}
+/* Подсказка над точкой этапа: воронка и этап, как в amoCRM */
+.stagebar{padding-top:2px}
+.stagebar button{position:relative;cursor:pointer}
+.stagebar button:hover,.stagebar button:focus-visible{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--accent);outline:none}
+.stagebar button[data-tip]:hover::after,.stagebar button[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;top:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#16222E;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;padding:6px 10px;border-radius:7px;white-space:pre;z-index:8;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.stagebar button.tip-l:hover::after,.stagebar button.tip-l:focus-visible::after{left:0;transform:none}
+.stagebar button.tip-r:hover::after,.stagebar button.tip-r:focus-visible::after{left:auto;right:0;transform:none}
 .stagelbl{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
 .dform{display:flex;flex-direction:column;gap:12px}
 .fk{font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
@@ -1276,10 +1283,11 @@ async function addDealTag(raw){ let t=String(raw||'').replace(/^#+/,'').replace(
   if(cur.length>=20){ toast('У сделки может быть не больше 20 тегов'); return }
   await setDealTags(cur.concat([t])); const i=$('#tagInp'); if(i) i.focus() }
 function renderStageBar(cur){ const box=$('#stageBar'); if(!box) return; const st=stagesOf((S.overlay&&S.overlay.pipe)||S.pipe); const idx=st.findIndex(s=>s.id===cur);
-  const lbl=stageOf(cur);
-  box.innerHTML='<div class="stagebar">'+st.map((s,i)=>{ const on=cur===WON||(idx>=0&&i<=idx); return '<button type="button" data-a="stage-pick" data-v="'+esc(s.id)+'" title="'+esc(s.name)+'" aria-label="Этап: '+esc(s.name)+'" style="background:'+(on?(cur===WON?'var(--ok)':lbl.color):'var(--surface-2)')+'"></button>' }).join('')+
-   '<button type="button" data-a="stage-pick" data-v="'+WON+'" title="Успешно реализовано" aria-label="Этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
-   '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i>'+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
+  const lbl=stageOf(cur), pname=pipeOf((S.overlay&&S.overlay.pipe)||S.pipe).name, n=st.length+1;
+  const tip=(i,name)=>' data-tip="'+esc(pname+'\n'+(i+1)+'. '+name+(i<idx?' ✓':''))+'" class="'+(i<n/4?'tip-l':i>=n*3/4?'tip-r':'')+'"';
+  box.innerHTML='<div class="stagebar">'+st.map((s,i)=>{ const on=cur===WON||(idx>=0&&i<=idx); return '<button type="button" data-a="stage-pick" data-v="'+esc(s.id)+'"'+tip(i,s.name+(s.id===cur?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: '+esc(s.name)+'" style="background:'+(on?(cur===WON?'var(--ok)':lbl.color):'var(--surface-2)')+'"></button>' }).join('')+
+   '<button type="button" data-a="stage-pick" data-v="'+WON+'"'+tip(st.length,'Успешно реализовано'+(cur===WON?' — сейчас здесь':''))+' aria-label="'+esc(pname)+', этап: Успешно" style="background:'+(cur===WON?'var(--ok)':'var(--surface-2)')+'"></button></div>'+
+   '<div class="stagelbl"><span class="pill '+(cur===WON?'ok':cur===LOST?'bad':'')+'"><i style="background:'+lbl.color+'"></i><span style="opacity:.65;font-weight:600">'+esc(pname)+' ·</span> '+esc(lbl.name)+'</span>'+(cur!==LOST?'<button type="button" class="btn sm ghost danger" data-a="stage-pick" data-v="'+LOST+'">Закрыть с отказом</button>':'')+(cur!==COLD?'<button type="button" class="btn sm ghost" style="color:#4F86C6" data-a="stage-pick" data-v="'+COLD+'">❄ В холодные</button>':'')+'</div>' }
 
 function normPhone(p){ let s=String(p||'').replace(/\D/g,''); if(s.length===11&&s[0]==='8') s='7'+s.slice(1); if(s.length===10) s='7'+s; return s.length>=10?s:'' }
 function lastChannel(dealId){ const cs=list('chat').filter(c=>c.deal===dealId).sort((a,b)=>(b.at||'').localeCompare(a.at||'')); return (cs[0]&&cs[0].channel)||'whatsapp' }
