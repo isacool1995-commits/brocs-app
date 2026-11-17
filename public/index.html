@@ -1151,6 +1151,7 @@ const SET_TABS=[['general','Общие настройки'],['users','Польз
 // Связь с ProfitBot считаем рабочей, если от него пришло хотя бы одно событие (тест или сообщение).
 function waStatus(){ const last=S.config&&S.config.messaging_last, snd=S.config&&S.config.messaging_send;
   if(snd&&snd.ok===false&&snd.at&&(!last||!last.at||snd.at>last.at)) return {cls:'bad',icon:'✕',text:'WhatsApp отключён',hint:'Номер +'+snd.from+' отключён в ProfitBot ('+fmtDate(snd.at,true)+'). Нужно заново подключить его в кабинете ProfitBot'};
+  if(((S.config&&S.config.messaging)||{}).paused) return {cls:'warn',icon:'⏸',text:'WhatsApp: приём на паузе',hint:'Сообщения клиентов сейчас приходят только в amoCRM. Включить приём можно в настройках → «Мессенджеры»'};
   if(!last||!last.at) return {cls:'bad',icon:'✕',text:'WhatsApp не подключён',hint:'От ProfitBot ещё не пришло ни одного события'};
   const days=Math.floor((Date.now()-new Date(last.at))/864e5), when='Последнее событие от ProfitBot: '+fmtDate(last.at,true);
   if(days>7) return {cls:'warn',icon:'!',text:'WhatsApp: тишина '+days+' дн.',hint:when};
@@ -1161,10 +1162,11 @@ function vSetMessaging(){ const m=(S.config&&S.config.messaging)||{}, last=(S.co
   let h='<div class="vh"><h1>Мессенджеры</h1></div>';
   h+='<section class="panel"><header><h2>WhatsApp, Telegram, MAX через ProfitBot</h2></header><div class="set-grid">'+
     '<label class="set-row"><span>Номер для «Брокс»</span><input class="inp num" id="msg-numbers" data-a="msg-numbers" value="'+esc(m.numbers||'')+'" placeholder="77476754306"></label>'+
+    '<label class="set-row"><span>Приём сообщений</span><span class="chk-l"><input type="checkbox" id="msg-paused" data-a="msg-paused"'+(m.paused?' checked':'')+'> Пауза: сообщения клиентов приходят только в amoCRM</span></label>'+
     '<div class="set-row"><span>Адрес вебхука</span><div class="crow"><code class="num" style="overflow-wrap:anywhere">'+esc(hook)+'</code><button type="button" class="btn sm" data-a="copy" data-v="'+esc(hook)+'">Копировать</button></div></div>'+
     '</div><p class="set-hint">«Брокс» принимает и отправляет сообщения только с этого номера. Сообщения других номеров вашего аккаунта ProfitBot, например подключённых к amoCRM, «Брокс» пропускает. Можно указать несколько номеров через запятую. Номер сохраняется, когда вы уходите из поля.</p></section>';
   h+='<section class="panel"><header><h2>Связь с ProfitBot</h2>'+waBadge()+'</header><div class="permx" style="border-top:0">'+
-    (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>, '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
+    (last?'<p style="margin:0">Последнее событие: <b>'+esc(evName[last.event]||last.event)+'</b>, '+esc(fmtDate(last.at,true))+(last.instance?' · номер '+esc(last.instance)+(last.ours===false?' <span class="pill warn">чужой номер, пропущено</span>':last.paused&&last.event!=='message.status'&&last.event!=='test'?' <span class="pill warn">пауза, пропущено</span>':' <span class="pill ok">ваш номер</span>'):'')+'</p>'
       :'<p class="notice warn" style="margin:0">От ProfitBot ещё не пришло ни одного события. Проверьте в кабинете ProfitBot → «API», что адрес вебхука сохранён, и нажмите там «Отправить тест».</p>')+
     '<span class="set-hint" style="margin:0">Страница обновляется сама, когда приходит событие.</span></div></section>';
   return h }
@@ -1741,6 +1743,7 @@ document.addEventListener('change',e=>{ const el=e.target; const a=el.dataset&&e
   else if(a==='fe-type'){ feCollect(); drawFieldsEditor() }
   else if(a==='msg-numbers'){ const v=el.value.split(/[,;\s]+/).map(normPhone).filter(Boolean).join(', '); el.value=v;
     saveConfig('messaging',{numbers:v}).then(ok=>{ if(ok) toast(v?'Номер сохранён':'Номер очищен') }) }
+  else if(a==='msg-paused'){ const v=el.checked; saveConfig('messaging',{paused:v}).then(ok=>{ if(ok) toast(v?'Приём сообщений в «Брокс» на паузе':'Приём сообщений в «Брокс» включён') }) }
   else if(a==='lf'){ const lf=lfGet(), k=el.dataset.k; lf[k]=el.value; if(k==='field') lf.fval=''; lfSave(); el.blur(); render(true) }
   else if(a==='lf-col'){ const lf=lfGet(), v=el.value; lf.cols=lf.cols.filter(x=>x!==v); if(el.checked) lf.cols.push(v); lfSave(); S.lfColsOpen=true; render(true); const dd=$('.lf-cols'); if(dd) dd.open=true }
   else if(a==='sr-pipe'){ S.overlay.pid=el.value; S.overlay.openStage=null; drawStageReq() }

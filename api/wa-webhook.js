@@ -87,8 +87,11 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: true });
   }
   const numbers = await ourNumbers();
-  await putDoc('config', 'messaging_last', { event: ev.event, at: new Date().toISOString(), instance: ev.instance ? ev.instance.phone : '', ours: !ev.instance || isOur(numbers, ev.instance.phone) }).catch(() => {});
+  const paused = !!((await getDoc('config', 'messaging')) || {}).paused;
+  await putDoc('config', 'messaging_last', { event: ev.event, at: new Date().toISOString(), instance: ev.instance ? ev.instance.phone : '', ours: !ev.instance || isOur(numbers, ev.instance.phone), paused }).catch(() => {});
   if (ev.instance && !isOur(numbers, ev.instance.phone)) return res.status(200).json({ ok: true, skipped: 'чужой номер' });
+  // Приём на паузе: сообщения остаются только в amoCRM, статусы отправленных из «Брокс» сообщений обновляются.
+  if (paused && ev.event !== 'message.status') return res.status(200).json({ ok: true, skipped: 'приём на паузе' });
   try {
     if (ev.event === 'message.status') await onStatus(ev);
     else if (ev.event === 'message.incoming' || ev.event === 'message.outgoing') await onMessage(ev);
